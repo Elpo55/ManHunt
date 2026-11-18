@@ -12,11 +12,30 @@ export type AbilityKey = "ghost" | "jammer" | "sprint" | "scan" | "tracker" | "b
 export type Dir8 = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" | "here";
 export type DistanceBand = "near" | "mid" | "far";
 
+/** Zone de jeu réelle : cercle géographique choisi par l'hôte. */
+export interface GameZone {
+  lat: number;
+  lng: number;
+  radius_m: number;
+  label: string;
+}
+
+/** Géoréférencement du maillage virtuel de la zone. */
+export interface MapGeo {
+  lat: number;
+  lng: number;
+  radius_m: number;
+  /** taille d'une case en mètres */
+  cell_m: number;
+  label?: string;
+}
+
 export interface MapData {
   w: number;
   h: number;
-  /** '.' libre, '#' bâtiment, '~' zone interdite */
+  /** '.' case jouable, '#' hors zone, '~' zone interdite virtuelle */
   rows: string[];
+  geo?: MapGeo;
 }
 
 export interface Cell {
@@ -46,8 +65,7 @@ export interface GameConfig {
   mode: GameMode;
   duration_s: number;
   prep_s: number;
-  map_size: "s" | "m" | "l";
-  obstacle_density: number;
+  zone: GameZone;
   forbidden_zones: boolean;
   hunter_ratio: number;
   step_regen_ms: number;

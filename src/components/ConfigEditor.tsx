@@ -1,9 +1,14 @@
 "use client";
 /** Éditeur des règles de partie (hôte). Valeurs bornées comme côté serveur. */
-import { BOUNDS, PRESETS, normalizeConfig } from "@/lib/engine/config";
+import dynamic from "next/dynamic";
+import { BOUNDS, PRESETS, applyPreset, normalizeConfig, zoneCells } from "@/lib/engine/config";
 import { ABILITIES, MODES, PRECISION_LABEL, TEAM_LABEL, formatDuration } from "@/lib/engine/rules";
 import type { AbilityKey, GameConfig, Team } from "@/lib/engine/types";
-import { Panel, RangeField, Segmented, SectionTitle, Toggle, cx } from "./ui/primitives";
+import { formatMeters } from "@/lib/map/geo";
+import { Panel, RangeField, Segmented, SectionTitle, Spinner, Toggle, cx } from "./ui/primitives";
+
+// MapLibre est chargé uniquement dans le navigateur, à la demande.
+const ZonePicker = dynamic(() => import("./map/ZonePicker"), { ssr: false, loading: () => <Spinner label="Chargement de la carte" /> });
 
 export function ConfigEditor({
   value,
@@ -30,7 +35,7 @@ export function ConfigEditor({
               key={p.id}
               type="button"
               disabled={disabled}
-              onClick={() => onChange(normalizeConfig({ ...p.config, abilities: value.abilities, mode: value.mode }))}
+              onClick={() => onChange(applyPreset(value, p.id))}
               className="rounded-[var(--radius-control)] bg-slate px-4 py-3 text-left transition-colors hover:bg-slate-2 disabled:opacity-50"
             >
               <span className="block font-medium">{p.label}</span>
@@ -67,25 +72,24 @@ export function ConfigEditor({
       </Panel>
 
       <Panel className="space-y-4">
-        <SectionTitle>Temps et carte</SectionTitle>
+        <SectionTitle>Zone de jeu</SectionTitle>
+        <p className="text-sm text-fog">
+          {value.zone.label} · rayon {formatMeters(value.zone.radius_m)}. Les positions restent virtuelles : personne n&apos;a besoin d&apos;être sur place.
+        </p>
+        <ZonePicker value={value.zone} disabled={disabled} onChange={(z) => set({ zone: z })} />
+        <Toggle
+          label="Zones interdites virtuelles"
+          description="Quelques secteurs infranchissables placés au hasard dans la zone."
+          checked={value.forbidden_zones}
+          disabled={disabled}
+          onChange={(v) => set({ forbidden_zones: v })}
+        />
+      </Panel>
+
+      <Panel className="space-y-4">
+        <SectionTitle>Temps</SectionTitle>
         <RangeField label="Durée de la traque" value={value.duration_s} {...BOUNDS.duration_s} format={seconds} disabled={disabled} onChange={(v) => set({ duration_s: v })} />
         <RangeField label="Préparation (les Fugitifs se cachent)" value={value.prep_s} {...BOUNDS.prep_s} format={(v) => (v ? seconds(v) : "Aucune")} disabled={disabled} onChange={(v) => set({ prep_s: v })} />
-        <div className="space-y-2">
-          <span className="text-sm">Taille de la carte</span>
-          <Segmented
-            label="Taille de la carte"
-            value={value.map_size}
-            disabled={disabled}
-            onChange={(v) => set({ map_size: v })}
-            options={[
-              { value: "s", label: "Petite 16²" },
-              { value: "m", label: "Moyenne 22²" },
-              { value: "l", label: "Grande 30²" },
-            ]}
-          />
-        </div>
-        <RangeField label="Densité de bâtiments" value={value.obstacle_density} {...BOUNDS.obstacle_density} format={(v) => `${Math.round(v * 100)} %`} disabled={disabled} onChange={(v) => set({ obstacle_density: v })} />
-        <Toggle label="Zones interdites" description="Secteurs infranchissables générés sur la carte." checked={value.forbidden_zones} disabled={disabled} onChange={(v) => set({ forbidden_zones: v })} />
       </Panel>
 
       <Panel className="space-y-4">

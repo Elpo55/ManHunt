@@ -3,14 +3,14 @@
  * MIROIR EXACT de private.normalize_config() (migration 0300).
  * Le test tests/db/config-parity.test.ts garantit la cohérence TS <-> SQL.
  */
-import type { AbilityConfig, AbilityKey, GameConfig } from "./types";
+import type { AbilityConfig, AbilityKey, GameConfig, GameZone } from "./types";
 
 type Bound = { min: number; max: number; step?: number };
 
 export const BOUNDS = {
   duration_s: { min: 120, max: 3600, step: 60 },
   prep_s: { min: 0, max: 600, step: 15 },
-  obstacle_density: { min: 0, max: 0.3, step: 0.02 },
+  zone_radius_m: { min: 200, max: 3000, step: 50 },
   hunter_ratio: { min: 0.1, max: 0.6, step: 0.05 },
   step_regen_ms: { min: 500, max: 10000, step: 250 },
   max_steps: { min: 1, max: 10, step: 1 },
@@ -42,8 +42,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   mode: "classic",
   duration_s: 900,
   prep_s: 60,
-  map_size: "m",
-  obstacle_density: 0.16,
+  zone: { lat: 48.8556, lng: 2.347, radius_m: 600, label: "Paris — Île de la Cité" },
   forbidden_zones: true,
   hunter_ratio: 0.3,
   step_regen_ms: 2000,
@@ -66,7 +65,24 @@ export const DEFAULT_CONFIG: GameConfig = {
   abilities: ABILITY_DEFAULTS,
 };
 
-export const MAP_SIZES = { s: 16, m: 22, l: 30 } as const;
+/** Nombre de cases sur le diamètre de la zone (identique à private.zone_cells). */
+export function zoneCells(radiusM: number): number {
+  return Math.max(16, Math.min(40, Math.round((2 * radiusM) / 25)));
+}
+
+function normalizeZone(z: unknown): GameZone {
+  const o = (z && typeof z === "object" ? z : {}) as Record<string, unknown>;
+  const D = DEFAULT_CONFIG.zone;
+  const raw = typeof o.label === "string" ? o.label : "";
+  // eslint-disable-next-line no-control-regex
+  const label = raw.replace(/[<>"\u0000-\u001f\u007f]/g, "").trim().slice(0, 80);
+  return {
+    lat: clamp(o.lat, D.lat, { min: -85, max: 85 }, 6),
+    lng: clamp(o.lng, D.lng, { min: -180, max: 180 }, 6),
+    radius_m: clamp(o.radius_m, D.radius_m, BOUNDS.zone_radius_m),
+    label: label || D.label,
+  };
+}
 
 function clamp(v: unknown, d: number, b: Bound, decimals = 0): number {
   if (typeof v !== "number" || !Number.isFinite(v)) return d;
@@ -103,8 +119,7 @@ export function normalizeConfig(input: unknown): GameConfig {
     mode: oneOf(c.mode, D.mode, ["classic", "infection"] as const),
     duration_s: clamp(c.duration_s, D.duration_s, BOUNDS.duration_s),
     prep_s: clamp(c.prep_s, D.prep_s, BOUNDS.prep_s),
-    map_size: oneOf(c.map_size, D.map_size, ["s", "m", "l"] as const),
-    obstacle_density: clamp(c.obstacle_density, D.obstacle_density, BOUNDS.obstacle_density, 2),
+    zone: normalizeZone(c.zone),
     forbidden_zones: bool(c.forbidden_zones, D.forbidden_zones),
     hunter_ratio: clamp(c.hunter_ratio, D.hunter_ratio, BOUNDS.hunter_ratio, 2),
     step_regen_ms: clamp(c.step_regen_ms, D.step_regen_ms, BOUNDS.step_regen_ms),
@@ -127,30 +142,53 @@ export function normalizeConfig(input: unknown): GameConfig {
     abilities,
   };
 }
-
-/** Préréglages proposés à l'hôte. */
-export const PRESETS: { id: string; label: string; description: string; config: Partial<GameConfig> }[] = [
+/**
+ * Préréglages proposés à l'hôte. Ils ne changent pas le lieu de la zone,
+ * seulement son rayon (`zoneRadius`) et le rythme de la partie.
+ */
+export const PRESETS: {
+  id: string;
+  label: string;
+  description: string;
+  zoneRadius: number;
+  config: Partial<GameConfig>;
+}[] = [
   {
     id: "standard",
     label: "Standard",
-    description: "15 min, carte moyenne, radar toutes les 60 s.",
+    description: "15 min, zone de 600 m de rayon, radar toutes les 60 s.",
+    zoneRadius: 600,
     config: {},
   },
   {
     id: "blitz",
     label: "Éclair",
-    description: "6 min sur petite carte, radar fréquent.",
-    config: { duration_s: 360, prep_s: 30, map_size: "s", radar: { ...DEFAULT_CONFIG.radar, interval_s: 30 } },
+    description: "6 min dans un quartier (350 m), radar fréquent.",
+    zoneRadius: 350,
+    config: { duration_s: 360, prep_s: 30, radar: { ...DEFAULT_CONFIG.radar, interval_s: 30 } },
   },
   {
     id: "marathon",
     label: "Longue traque",
-    description: "30 min, grande carte, radar plus rare mais précis.",
+    description: "30 min sur 1,2 km de rayon, radar plus rare mais précis.",
+    zoneRadius: 1200,
     config: {
       duration_s: 1800,
       prep_s: 90,
-      map_size: "l",
       radar: { ...DEFAULT_CONFIG.radar, interval_s: 120, precision: "zone" },
     },
   },
 ];
+
+/** Applique un préréglage en conservant le lieu choisi et les capacités. */
+export function applyPreset(current: GameConfig, presetId: string): GameConfig {
+  const p = PRESETS.find((x) => x.id === presetId);
+  if (!p) return current;
+  return normalizeConfig({
+    ...p.config,
+    mode: current.mode,
+    abilities: current.abilities,
+    forbidden_zones: current.forbidden_zones,
+    zone: { ...current.zone, radius_m: p.zoneRadius },
+  });
+}
