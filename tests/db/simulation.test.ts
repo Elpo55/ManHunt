@@ -1,19 +1,20 @@
 /**
- * Simulation de charge côté moteur : 20 joueurs (6 Chasseurs, 14 Fugitifs)
- * jouent des actions aléatoires valides pendant plusieurs minutes de jeu.
+ * Simulation de charge du moteur GPS : 20 joueurs (6 Chasseurs, 14 Fugitifs)
+ * marchent dans une zone réelle de 500 m et envoient leur position toutes
+ * les 5 s pendant 6 minutes de jeu ; les Chasseurs poursuivent et tentent
+ * des captures.
  *
- * Ce test vérifie la cohérence du moteur serveur sous charge (invariants,
- * séquences, isolation). Il NE mesure PAS la latence réseau ni Realtime :
- * voir scripts/load-test.mjs pour le test de charge contre un vrai projet.
+ * Vérifie la cohérence serveur sous charge (validations, séquences,
+ * confidentialité) et estime le volume Realtime. Ne mesure PAS la latence
+ * réseau : voir scripts/load-test.mjs pour un test contre un vrai projet.
  */
 import { describe, expect, it } from "vitest";
-import { keepAlive, setupGame, skipPreparation } from "./fixtures";
+import { at, keepAlive, setupGame, skipPreparation } from "./fixtures";
 
 type Json = Record<string, any>;
 
 function mulberry32(seed: number) {
   return () => {
-    seed |= 0;
     seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
@@ -21,102 +22,76 @@ function mulberry32(seed: number) {
   };
 }
 
-describe("simulation 20 joueurs", () => {
-  it("reste cohérent sur 240 cycles d'actions concurrentes", async () => {
-    const f = await setupGame({
-      hunters: 6,
-      fugitives: 14,
-      openMap: false,
-      config: { duration_s: 1800, prep_s: 30, radar: { interval_s: 30 }, map_size: "l", step_regen_ms: 1000 },
-    });
+describe("simulation 20 joueurs GPS", () => {
+  it("reste cohérente sur 6 minutes de déplacements réels", async () => {
+    const f = await setupGame({ hunters: 6, fugitives: 14, config: { duration_s: 1800, prep_s: 60, radar: { interval_s: 60 } } });
     await skipPreparation(f);
-    const rnd = mulberry32(1234);
+    const rnd = mulberry32(42);
     const all = [...f.hunters, ...f.fugitives];
-    const [{ map }] = await f.db.sql<{ map: { w: number; h: number; rows: string[] } }>(
-      `select map from public.games where id = $1`,
-      [f.gameId],
-    );
-    const open = (x: number, y: number) => x >= 0 && y >= 0 && x < map.w && y < map.h && map.rows[y][x] === ".";
-    let ok = 0, rejected = 0;
-    const timings: number[] = [];
+    const pos = new Map(all.map((u, i) => [u.id, { e: Math.cos(i) * 300, s: Math.sin(i) * 300 }]));
+    const isHunter = new Set(f.hunters.map((h) => h.id));
+    let accepted = 0;
     const errors = new Map<string, number>();
+    const timings: number[] = [];
+    const count = (code: string) => errors.set(code, (errors.get(code) ?? 0) + 1);
 
-    for (let cycle = 0; cycle < 240; cycle++) {
-      await f.db.advance(1000);
-      if (cycle % 10 === 0) await keepAlive(f.db, f.gameId);
-      const phase = (await f.db.sql<{ phase: string }>(`select phase from public.games where id = $1`, [f.gameId]))[0].phase;
-      if (phase === "finished") break;
-      // Chaque cycle : 5 joueurs aléatoires agissent.
-      for (let k = 0; k < 5; k++) {
-        const u = all[Math.floor(rnd() * all.length)];
-        const me = (await f.db.sql<Json>(`select * from public.player_states where game_id = $1 and user_id = $2`, [f.gameId, u.id]))[0];
-        if (me.status !== "active") continue;
+    for (let cycle = 0; cycle < 72; cycle++) {
+      await f.db.advance(5000);
+      const status = await f.db.sql<Json>(`select user_id, status from public.player_states where game_id = $1`, [f.gameId]);
+      const active = new Set(status.filter((s) => s.status === "active").map((s) => s.user_id));
+      if ((await f.db.sql<Json>(`select phase from public.games where id = $1`, [f.gameId]))[0].phase === "finished") break;
+
+      for (const u of all) {
+        if (!active.has(u.id)) continue;
+        const p = pos.get(u.id)!;
+        // Marche ~1,5 m/s ; les Chasseurs se dirigent vers le Fugitif actif le plus proche.
+        let dx = rnd() * 2 - 1, dy = rnd() * 2 - 1;
+        if (isHunter.has(u.id)) {
+          const target = f.fugitives.filter((x) => active.has(x.id)).map((x) => pos.get(x.id)!)
+            .sort((a, b) => Math.hypot(a.e - p.e, a.s - p.s) - Math.hypot(b.e - p.e, b.s - p.s))[0];
+          if (target) { dx = target.e - p.e; dy = target.s - p.s; }
+        }
+        const n = Math.hypot(dx, dy) || 1;
+        p.e = Math.max(-450, Math.min(450, p.e + (dx / n) * 7.5));
+        p.s = Math.max(-450, Math.min(450, p.s + (dy / n) * 7.5));
         const t0 = performance.now();
         try {
-          const roll = rnd();
-          if (me.team === "hunter" && roll < 0.15) {
-            await f.db.as(u).rpc("attempt_capture", { p_game: f.gameId });
-          } else if (roll < 0.2) {
-            const keys = me.team === "hunter" ? ["tracker", "scan"] : ["ghost", "sprint", "jammer"];
-            const key = keys[Math.floor(rnd() * keys.length)];
-            await f.db.as(u).rpc("use_ability", {
-              p_game: f.gameId,
-              p_key: key,
-              p_target: key === "scan" ? { x: me.x, y: me.y } : null,
-            });
-          } else {
-            const path: number[][] = [];
-            let cx = me.x, cy = me.y;
-            const len = 1 + Math.floor(rnd() * 2);
-            for (let s = 0; s < len; s++) {
-              const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => open(cx + dx, cy + dy));
-              if (!dirs.length) break;
-              const [dx, dy] = dirs[Math.floor(rnd() * dirs.length)];
-              cx += dx; cy += dy;
-              path.push([cx, cy]);
-            }
-            if (path.length) await f.db.as(u).rpc("move", { p_game: f.gameId, p_path: path });
-          }
-          ok++;
+          const g = at(p.e, p.s);
+          await f.db.as(u).rpc("report_position", {
+            p_game: f.gameId, p_lat: g.lat, p_lng: g.lng, p_accuracy: 5 + rnd() * 10, p_recorded_at: f.db.now().getTime(),
+          });
+          accepted++;
+          if (isHunter.has(u.id) && cycle % 2 === 0) await f.db.as(u).rpc("attempt_capture", { p_game: f.gameId });
         } catch (e) {
-          rejected++;
-          const code = (e as { code: string }).code;
-          errors.set(code, (errors.get(code) ?? 0) + 1);
+          count((e as { code: string }).code);
         }
         timings.push(performance.now() - t0);
       }
-      await f.db.as(all[cycle % all.length]).rpc("game_tick", { p_game: f.gameId }).catch(() => undefined);
+      if (cycle % 6 === 0) await keepAlive(f.db, f.gameId);
     }
 
-    // Invariants
-    const ps = await f.db.sql<Json>(`select * from public.player_states where game_id = $1`, [f.gameId]);
-    for (const p of ps) {
-      expect(open(p.x, p.y)).toBe(true);
-      expect(p.steps).toBeGreaterThanOrEqual(0);
-      expect(["active", "captured", "abandoned"]).toContain(p.status);
-    }
-    const seqs = await f.db.sql<{ stream: string; sns: string[] }>(
-      `select stream, array_agg(sn order by sn) sns from public.game_events where game_id = $1 group by stream`,
-      [f.gameId],
-    );
+    const allowed = new Set(["E_COOLDOWN", "E_RATE_LIMITED", "E_NOT_ACTIVE", "E_GAME_FINISHED", "E_OUT_OF_ZONE"]);
+    for (const code of errors.keys()) expect(allowed.has(code), `erreur inattendue ${code}`).toBe(true);
+
+    const seqs = await f.db.sql<{ sns: string[] }>(
+      `select array_agg(sn order by sn) sns from public.game_events where game_id = $1 group by stream`, [f.gameId]);
     for (const s of seqs) {
       const sns = s.sns.map(Number);
       expect(sns).toEqual(Array.from({ length: sns.length }, (_, i) => i + 1));
     }
-    // Erreurs attendues uniquement (règles du jeu), aucune erreur interne.
-    const allowed = new Set(["E_COOLDOWN", "E_NOT_ENOUGH_STEPS", "E_NO_USES_LEFT", "E_BLOCKED", "E_RATE_LIMITED", "E_NOT_ACTIVE", "E_CANNOT_CAPTURE_NOW", "E_PHASE", "E_CANNOT_MOVE_NOW"]);
-    for (const code of errors.keys()) expect(allowed.has(code), `erreur inattendue ${code}`).toBe(true);
-
-    const radar = await f.db.sql<Json>(`select count(*)::int n from public.radar_pulses where game_id = $1`, [f.gameId]);
     const [usage] = await f.db.sql<Json>(`select sum(broadcasts)::int b, sum(delivered_estimate)::int d from private.usage_daily`);
+    const [stats] = await f.db.sql<Json>(
+      `select count(*) filter (where status = 'captured')::int captured, sum(distance)::int dist from public.player_states where game_id = $1`, [f.gameId]);
+    const seconds = 72 * 5;
     timings.sort((a, b) => a - b);
-    const p50 = timings[Math.floor(timings.length * 0.5)], p95 = timings[Math.floor(timings.length * 0.95)];
     console.log(
-      `[simulation] actions acceptées=${ok} refusées=${rejected} (${JSON.stringify(Object.fromEntries(errors))}) ` +
-        `radar=${radar[0].n} broadcasts=${usage.b} livraisons estimées=${usage.d} ` +
-        `RPC PGlite p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms`,
+      `[simulation GPS] positions acceptées=${accepted} refus=${JSON.stringify(Object.fromEntries(errors))} ` +
+        `captures=${stats.captured} distance cumulée=${stats.dist} m broadcasts=${usage.b} ` +
+        `livraisons estimées=${usage.d} (~${(usage.d / seconds).toFixed(0)}/s) ` +
+        `RPC PGlite p50=${timings[Math.floor(timings.length / 2)].toFixed(1)}ms`,
     );
-    expect(ok).toBeGreaterThan(500);
-    expect(radar[0].n).toBeGreaterThanOrEqual(5);
-  }, 300_000);
+    expect(accepted).toBeGreaterThan(500);
+    expect(stats.captured).toBeGreaterThan(0);
+    expect(usage.d / seconds).toBeLessThan(100); // limite gratuite Realtime : 100 messages/s
+  }, 600_000);
 });

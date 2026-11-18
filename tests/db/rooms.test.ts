@@ -61,11 +61,11 @@ describe("salons", () => {
     const state = await db.as(alice).rpc<{ room: { config: Record<string, any> } }>("get_room_state", {
       p_room: r.room_id,
     });
-    expect(state.room.config.duration_s).toBe(3600);
+    expect(state.room.config.duration_s).toBe(7200);
     expect(state.room.config.prep_s).toBe(0);
-    expect(state.room.config.radar.precision).toBe("sector");
+    expect(state.room.config.radar.precision).toBe("direction");
     expect(Object.keys(state.room.config.abilities).sort()).toEqual(
-      ["barrier", "ghost", "jammer", "scan", "sprint", "tracker"].sort(),
+      ["decoy", "ghost", "jammer", "scan", "sonar", "tracker"].sort(),
     );
   });
 
@@ -178,6 +178,13 @@ describe("salons", () => {
     await db.as(alice).rpc("set_member_team", { p_room: r.room_id, p_user: bob.id, p_team: "hunter" });
     await expectRpcError(db.as(alice).rpc("start_game", { p_room: r.room_id }), "E_TEAMS_UNBALANCED");
     await db.as(alice).rpc("set_member_team", { p_room: r.room_id, p_user: bob.id, p_team: "fugitive" });
+    await expectRpcError(db.as(alice).rpc("start_game", { p_room: r.room_id }), "E_ZONE_NOT_SET");
+    await db.as(alice).rpc("update_room_settings", {
+      p_room: r.room_id,
+      p_config: { zone: { lat: 48.85, lng: 2.35, radius_m: 400, label: "Test", set: true } },
+    });
+    await expectRpcError(db.as(alice).rpc("start_game", { p_room: r.room_id }), "E_CONSENT_MISSING");
+    for (const u of [alice, bob]) await db.as(u).rpc("set_location_consent", { p_room: r.room_id, p_consent: true });
     const g = await db.as(alice).rpc<{ game_id: string }>("start_game", { p_room: r.room_id });
     expect(g.game_id).toBeTruthy();
     await expectRpcError(db.as(carol).rpc("join_room", { p_code: r.code }), "E_GAME_IN_PROGRESS");
