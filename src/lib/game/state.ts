@@ -117,6 +117,8 @@ export interface GameView {
   streams: { all: number; team: number; p: number };
   events: GameEvent[];
   final: FinalEntry[] | null;
+  /** topic Realtime courant de l'équipe (rotation en mode Infection) */
+  team_topic?: string;
 }
 
 export interface GameState {
@@ -255,6 +257,8 @@ export function applyEvent(s: GameState, ev: GameEvent): GameState {
         next.allies = allies;
       }
       next.visible = s.visible.filter((v) => v.u !== d.f);
+      // Infection : le topic Fugitif change, les Fugitifs se resynchronisent.
+      if (d.infected && s.me.team === "fugitive") next.needsResync = true;
       if (d.f === s.me.u && !d.infected) next.me = { ...s.me, status: "captured" };
       if (d.h === s.me.u) next.me = { ...(next.me ?? s.me), captures: s.me.captures + 1 };
       break;

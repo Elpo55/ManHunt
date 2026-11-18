@@ -93,7 +93,7 @@ function CooldownButton({
       disabled={disabled || cooling || loading}
       aria-label={cooling ? `${label}, disponible dans ${Math.ceil(remainingMs / 1000)} secondes` : label}
       className={cx(
-        "relative flex h-14 min-w-14 flex-1 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-[12px] px-2 text-[11px] transition-colors disabled:cursor-not-allowed",
+        "relative flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-[12px] px-2 text-[11px] transition-colors disabled:cursor-not-allowed",
         active ? "bg-warn/20 text-warn ring-1 ring-warn" : "bg-slate text-ivory hover:bg-slate-2",
         (disabled || cooling) && !active && "text-fog-2",
         tone === "hunter" && !cooling && !disabled && "bg-hunter text-white hover:bg-hunter/90",
@@ -193,5 +193,5 @@ export function ActionBar({
       />,
     );
   }
-  return <div className="flex gap-2">{items}</div>;
+  return <div className="grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-2">{items}</div>;
 }

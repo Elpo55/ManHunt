@@ -18,7 +18,7 @@ const COLORS = {
   building: "#1c2029",
   buildingEdge: "#262b35",
   forbidden: "#ff5a4e",
-  fog: "rgba(5,6,8,0.62)",
+  fog: "rgba(5,6,8,0.74)",
   volt: "#2f6bff",
   hunter: "#ff5a4e",
   fugitive: "#4fd1a5",
@@ -157,8 +157,15 @@ export const GameMap = forwardRef<MapHandle, GameMapProps>(function GameMap(prop
         }
     }
 
-    // Brouillard de guerre
+    // Brouillard de guerre (zone visible légèrement éclairée)
     if (vision) {
+      ctx.fillStyle = "rgba(236,232,223,0.025)";
+      for (let y = y0; y <= y1; y++)
+        for (let x = x0; x <= x1; x++) {
+          if (!vision[y * map.w + x]) continue;
+          const [px, py] = toPx(x, y);
+          ctx.fillRect(px, py, s + 0.5, s + 0.5);
+        }
       ctx.fillStyle = COLORS.fog;
       for (let y = y0; y <= y1; y++)
         for (let x = x0; x <= x1; x++) {
@@ -434,9 +441,13 @@ export const GameMap = forwardRef<MapHandle, GameMapProps>(function GameMap(prop
     };
   }, [requestDraw]);
 
-  useEffect(() => () => {
-    if (frame.current != null) cancelAnimationFrame(frame.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (frame.current != null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+    },
+    [],
+  );
 
   return (
     <div ref={wrapRef} className="absolute inset-0 touch-none select-none">

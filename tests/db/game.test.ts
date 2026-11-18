@@ -275,8 +275,21 @@ describe("captures et victoire", () => {
     expect([r1.team, r1.status, r1.initial_team]).toEqual(["hunter", "active", "fugitive"]);
     const personal = await f.db.broadcasts(`game:${f.gameId}:p:${f1.id}`);
     expect(personal.map((m) => m.payload.t)).toContain("team_changed");
+    // Rotation du topic Fugitif : l'infecté ne peut plus écouter son ancienne équipe.
+    const gid = f.gameId;
+    expect(await f.db.as(f1).canRead(`game:${gid}:fugitive`)).toBe(false);
+    expect(await f.db.as(f1).canRead(`game:${gid}:fugitive:e1`)).toBe(false);
+    expect(await f.db.as(f2).canRead(`game:${gid}:fugitive`)).toBe(false);
+    expect(await f.db.as(f2).canRead(`game:${gid}:fugitive:e1`)).toBe(true);
+    expect(await f.db.as(f1).canRead(`game:${gid}:hunter`)).toBe(true);
+    const v2 = await f.db.as(f2).rpc<Json>("get_game_view", { p_game: gid });
+    expect(v2.team_topic).toBe(`game:${gid}:fugitive:e1`);
+    await f.db.clearBroadcasts();
+    await f.db.as(f2).rpc("move", { p_game: gid, p_path: [[15, 16]] });
+    expect((await f.db.broadcasts(`game:${gid}:fugitive`)).length).toBe(0);
+    expect((await f.db.broadcasts(`game:${gid}:fugitive:e1`)).map((m) => m.payload.t)).toContain("move");
     // L'infecté peut maintenant capturer.
-    await place(f.db, f.gameId, f1, 15, 14);
+    await place(f.db, f.gameId, f1, 15, 15);
     await f.db.as(f1).rpc("attempt_capture", { p_game: f.gameId });
     const [g] = await f.db.sql<Json>(`select winner from public.games where id = $1`, [f.gameId]);
     expect(g.winner).toBe("hunter");

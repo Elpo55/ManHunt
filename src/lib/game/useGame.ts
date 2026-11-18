@@ -62,6 +62,7 @@ export function useGame(
     emptySnapshot,
   );
   const team = snap.state?.me.team ?? null;
+  const teamTopic = snap.state ? (snap.state.view.team_topic ?? `game:${snap.state.game.id}:${team}`) : null;
 
   const handlers = controller
     ? { onMessage: (_e: string, p: unknown) => controller.handleEvent(p as GameEvent), onSubscribed: () => controller.scheduleResync(400) }
@@ -73,7 +74,7 @@ export function useGame(
     ...handlers,
     presence: userId ? { key: userId, meta: presenceMeta, onSync: setOnline } : undefined,
   });
-  const sTeam = useChannel({ topic: controller && team ? `game:${controller.gameId}:${team}` : null, events: ["ev"], ...handlers });
+  const sTeam = useChannel({ topic: controller && teamTopic ? teamTopic : null, events: ["ev"], ...handlers });
   const sMe = useChannel({ topic: controller && userId ? `game:${controller.gameId}:p:${userId}` : null, events: ["ev"], ...handlers });
   const statuses = [sAll, sTeam, sMe];
   const connection: ChannelStatus = statuses.includes("offline")

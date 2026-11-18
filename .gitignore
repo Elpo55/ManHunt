@@ -46,3 +46,4 @@ supabase/.temp/
 supabase/.branches/
 # tests
 coverage/
+.load-test-sessions.json
