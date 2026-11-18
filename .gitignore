@@ -47,3 +47,9 @@ supabase/.branches/
 # tests
 coverage/
 .load-test-sessions.json
+
+# mobile
+apps/mobile/.env
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/dist/
