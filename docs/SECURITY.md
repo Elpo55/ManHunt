@@ -1,41 +1,38 @@
-# Sécurité
+# Sécurité, confidentialité et sûreté (v0.2 — GPS réel)
 
-## Principes
+## Données de localisation
 
-1. **Le client n'est jamais cru** : il n'écrit dans aucune table de jeu. Chaque action passe par une fonction RPC qui vérifie l'identité (`auth.uid()`), l'appartenance, l'équipe, la phase, les recharges, les distances, puis applique l'effet dans une transaction verrouillée.
-2. **Moindre privilège** : `revoke all` puis droits minimaux ; le rôle `anon` (clé publique sans session) ne peut rien exécuter ; les fonctions du schéma `private` ne sont pas exposées.
-3. **Isolation des équipes** à trois niveaux : RLS sur les tables, privilèges de colonnes sur `games`, autorisation des canaux Realtime privés.
+| Mesure | Mise en œuvre |
+|--------|---------------|
+| Partage uniquement pendant une partie | le serveur refuse toute position hors partie active (`E_GAME_FINISHED`, `E_NOT_ACTIVE`) ; l'application n'active le GPS que sur l'écran de jeu d'une partie active |
+| Consentement explicite | accord dans le lobby (`set_location_consent`), exigé par `start_game` et `report_position` ; toute modification des règles annule les accords |
+| Positions brutes protégées | tables `private.player_positions` / `private.position_history` : schéma non exposé par l'API, aucun droit pour les rôles clients (testé) |
+| Affichage approximatif | coéquipiers ~10 m, adversaires `max(approx_m, précision GPS)` sur une grille stable ; jamais plus précis que le GPS réel |
+| Fréquence limitée | envoi ≥ 3 s (5 s par défaut), diffusion aux adversaires ≤ 1 fois / `enemy_refresh_s` |
+| Accès réservé | canaux Realtime privés par audience, RLS ; le flux public ne contient jamais de coordonnées (testé) |
+| Rétention | positions brutes effacées 24 h après la fin de partie (`private.cleanup`, quotidien si pg_cron activé) ; historique approximatif des événements supprimé après 30 jours |
+| Retrait immédiat | `safety_stop` / `leave_game` : sortie de partie + effacement des positions brutes du joueur + arrêt du GPS |
+| Pas de suivi hors jeu | aucune fonction de localisation en dehors des parties ; suivi orphelin coupé au démarrage de l'application ; déconnexion = arrêt |
 
-## Contrôles en place (testés)
+## Sûreté dans le monde réel (intégrée au produit)
 
-| Menace | Protection | Test |
-|--------|-----------|------|
-| Lire la position d'un adversaire | RLS `player_states` (soi + équipe) ; `get_game_view` ne renvoie que les adversaires visibles | `security.test.ts` |
-| Écouter le canal de l'autre équipe | politique `realtime.messages` → `can_access_topic` | `security.test.ts` |
-| Garder l'écoute de son ancienne équipe (Infection) | rotation du topic Fugitif | `game.test.ts` (Infection) |
-| Diffuser de faux événements | aucune politique d'insertion broadcast pour les clients | `security.test.ts` |
-| Modifier sa position / son score | aucune écriture directe ; `permission denied` | `security.test.ts`, `rooms.test.ts` |
-| Téléportation, traversée de murs | validation du chemin case par case | `game.test.ts` |
-| Double capture / double impulsion radar | verrou `FOR UPDATE` par partie + index unique `radar_pulses` | `game.test.ts` |
-| Spam d'actions | `private.rate_limit` (déplacement 6/s, capture 3/s, capacités 4/s, tick 30/10 s…) | `rooms.test.ts` |
-| Force brute des codes de salon | 10 tentatives/min/utilisateur, comptées même en cas d'échec ; alphabet de 32 symboles × 6 = ~1 milliard de codes | `rooms.test.ts` |
-| Rejoindre après exclusion | `room_bans` | `rooms.test.ts` |
-| Actions d'hôte par un joueur | `lock_room_as_host` / `lock_game_as_host` | `rooms.test.ts`, `game.test.ts` |
-| Lire les colonnes techniques (visibilité) | privilèges de colonnes | `security.test.ts` |
-| Clé `service_role` exposée | jamais utilisée par l'application ; seules l'URL et la clé publique sont dans le frontend | revue |
-| XSS | React échappe le contenu ; pseudos limités à `[A-Za-z0-9 accents _.-]` ; CSP stricte (`public/_headers`) | revue |
-| Clickjacking | `X-Frame-Options: DENY`, `frame-ancestors 'none'` | revue |
+- Consignes affichées et acceptées avant chaque partie (espaces publics, pas de propriété privée, pas de course sur la chaussée, zone, arrêt possible).
+- Capture **sans contact** (proximité GPS) : aucune incitation à attraper physiquement quelqu'un.
+- Vitesse > 43 km/h (réglable) refusée : décourage les véhicules.
+- Zone limitée et visible ; sortie signalée ; fin ou pause immédiate par l'hôte ; bouton **Arrêt** permanent pour chaque joueur.
+- Aucun objectif imposé dans un lieu précis.
+
+## Contrôles applicatifs (repris de v0.1, toujours testés)
+
+RLS sur toutes les tables, aucune écriture directe, fonctions privées non exécutables, rôle anonyme sans droit, limitation de fréquence (dont anti-force brute des codes), verrous par partie, rotation du topic Fugitif (Infection), séquences contiguës.
+
+## Secrets
+
+L'application ne contient que l'URL et la clé **publique** Supabase. La session est dans le trousseau sécurisé (Keychain / Keystore). Aucune clé `service_role` / *secret key* ne doit être placée dans `apps/mobile/.env`, dans EAS ou dans le dépôt.
 
 ## Limites connues
 
-- Un joueur **capturé** (mode Classique) garde l'accès aux informations de son équipe (spectateur). Il pourrait les communiquer hors de l'application : c'est un risque social, pas technique.
-- Un membre **exclu** reste connecté au canal du salon jusqu'à sa prochaine reconnexion ; ce canal ne transporte que des notifications de lobby (aucun secret de partie).
-- Les comptes invités sont anonymes : un joueur peut recréer un profil. Pour un groupe privé c'est acceptable ; activer le CAPTCHA (Supabase > Authentication > Attack Protection) si l'URL circule largement.
-- La CSP autorise `'unsafe-inline'` pour les scripts (nécessaire aux scripts d'amorçage de l'export statique Next.js).
-
-## Bonnes pratiques d'exploitation
-
-- Ne jamais commiter `.env.local` (déjà ignoré par Git).
-- Ne jamais copier la clé `service_role` / « secret key » dans Cloudflare ni dans le code.
-- Désactiver l'accès public Realtime (voir SETUP_GUIDE.md, étape Realtime) pour imposer les canaux privés.
-- Garder les migrations comme seule source de modification du schéma.
+- La précision réelle dépend du téléphone et de l'environnement (immeubles, intérieur) ; une précision > `max_accuracy_m` empêche de capturer.
+- Un joueur peut fausser son GPS (applications de position simulée) : la vitesse implausible est bloquée, pas une téléportation lente. Pour un jeu entre amis, c'est accepté et documenté.
+- Les membres d'une même équipe se voient à ~10 m : c'est voulu (coordination).
+- Les données transitent par les serveurs Supabase (région choisie à la création du projet) et les tuiles par le fournisseur cartographique (qui voit les zones consultées, pas les positions des joueurs).

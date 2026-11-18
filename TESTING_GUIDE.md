@@ -1,120 +1,98 @@
 # Guide de tests
 
-Trois niveaux, clairement distincts :
+| Niveau | Outil | Projet Supabase ? | Appareil ? | État |
+|--------|-------|-------------------|-----------|------|
+| Unitaires (logique partagée) | Vitest | non | non | ✅ exécutés (25) |
+| Base de données (intégration, sécurité, GPS, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel) | non | non | ✅ exécutés (53) |
+| Typage, lint, `expo-doctor`, bundles Metro Android/iOS | tsc, ESLint, Expo | non | non | ✅ exécutés |
+| Test de charge réseau réel (20 clients Realtime) | `scripts/load-test.mjs` | **oui** | non | ⏳ à lancer par vous |
+| Tests sur téléphones (GPS, arrière-plan, carte) | procédures ci-dessous | **oui** | **oui** | ⏳ à faire par vous — **jamais réalisés à ce jour** |
 
-| Niveau | Outil | Besoin d'un projet Supabase ? | État |
-|--------|-------|-------------------------------|------|
-| Tests automatisés unitaires | Vitest | non | ✅ exécutés |
-| Tests automatisés base de données (intégration, sécurité, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel en WASM) | non | ✅ exécutés |
-| Test de charge réseau réel (20 clients Realtime) | `scripts/load-test.mjs` | **oui** | ⏳ à lancer par vous |
-| Tests manuels multi-téléphones | procédure ci-dessous | **oui** + déploiement | ⏳ à faire par vous |
-
----
-
-## 1. Lancer les tests automatisés
+## 1. Tests automatisés
 
 ```bash
 npm install
-npm test              # tout : 87 tests
-npm run test:unit     # moteur client (grille, chemins, radar, états, séquenceur, horloge, contrôleur)
-npm run test:db       # PostgreSQL : salons, moteur de jeu, RLS, Realtime, cron, simulation
-npm run typecheck
-npm run lint
-npm run build         # vérifie l'export statique
+npm test                 # 78 tests
+npm run test:unit        # géographie, configuration, état, couches carte, contrôleur, séquenceur, horloge
+npm run test:db          # salons, moteur GPS, sécurité, parité TS/SQL, cron, simulation
+npm run typecheck        # racine + shared + mobile
+npm run lint             # application mobile
+cd apps/mobile && npx expo-doctor && npx expo export --platform android
 ```
 
-### Ce que couvrent les tests base de données
+Couverture des tests base de données (PostgreSQL réel, rôles et RLS appliqués) :
+- **game.test.ts** : zone et consentement obligatoires ; aucune position initiale ; validation des positions (bornes, horodatage, ordre, **vitesse implausible**, distance) ; refus sans consentement / après la fin ; diffusion ~10 m aux coéquipiers et approximative + limitée aux adversaires ; précision jamais supérieure au GPS ; Fugitifs invisibles en préparation ; sortie de zone et élimination ; capture refusée hors zone ; captures par distance réelle (précision, fraîcheur, recharge, victoire) ; Infection et rotation du canal ; radar direction/distance, brouillage, signal perdu, secteur, zone, mode « impulsions » ; Fantôme, Leurre, Brouilleur, Scan, Traqueur, Sonar ; **arrêt de sécurité** (sortie + effacement) ; **rétention 24 h** ; vue de partie sans coordonnées adverses exactes ; pause ; fin du temps ; abandon.
+- **security.test.ts** : positions brutes inaccessibles à tous les clients, isolation des équipes, colonnes techniques, journal filtré, aucune écriture directe, fonctions privées inaccessibles, rôle anonyme, non-participant, autorisations des canaux Realtime, interdiction de diffuser, **aucune coordonnée brute dans aucun flux**, séquences contiguës.
+- **simulation.test.ts** : 20 joueurs marchant ~1,5 m/s pendant 6 min, envoi toutes les 5 s, poursuites et captures ; invariants et volume Realtime (~32 messages/s).
+- **rooms.test.ts** : profils, salons, codes, force brute, équipes, hôte, exclusion, conditions de lancement.
 
-Les migrations réelles sont appliquées à un PostgreSQL embarqué, avec des substituts minimaux de Supabase (`tests/db/supabase-stubs.sql` : rôles `anon`/`authenticated`, `auth.uid()`, `realtime.send`, `realtime.messages`). Les requêtes s'exécutent sous le rôle `authenticated` avec l'identité du joueur : **la RLS s'applique réellement**. L'horloge serveur est pilotée (`db.advance(ms)`).
+## 2. Simuler 20 joueurs réels (charge réseau)
 
-- `rooms.test.ts` : profils, création/rejoindre/quitter, salon plein, codes invalides, force brute (limitation), équipes, répartition auto, exclusion/bannissement, transfert d'hôte (départ et inactivité), conditions de démarrage, configurations sauvegardées.
-- `game.test.ts` : génération de carte (connexité, déterminisme), apparition, préparation, déplacements (chemin, obstacles, pas, régénération), visibilité, captures, victoire/égalité/abandon, déconnexion et délai de grâce, pause/reprise, radar (synchronisation, doublons, rattrapage, précisions, brouillage, manuel), capacités, mode Infection + rotation de topic, resynchronisation.
-- `security.test.ts` : isolation des équipes (tables, colonnes, journal), écritures interdites, fonctions privées, rôle anonyme, autorisation des topics Realtime, interdiction de diffuser, absence de fuite de positions, contiguïté des séquences.
-- `simulation.test.ts` : **20 joueurs** (6 Chasseurs, 14 Fugitifs), 240 secondes de jeu, ~1 200 actions concurrentes ; vérifie les invariants (positions valides, pas ≥ 0, séquences contiguës, uniquement des refus réglementaires) et mesure les messages.
-- `config-parity.test.ts` : la normalisation de configuration TS et SQL produit exactement le même résultat.
-- `cron.test.ts` : le script optionnel pg_cron fait avancer les parties sans client.
-
-> La simulation mesure la **cohérence du moteur sous charge**, pas la latence réseau. La latence réelle se mesure avec le test de charge ci-dessous.
-
-## 2. Simuler 20 joueurs réels (test de charge)
-
-Prérequis : projet Supabase configuré, `.env.local` rempli, invités anonymes activés.
-
+Prérequis : projet Supabase configuré, `apps/mobile/.env` rempli, mode invité activé.
 ```bash
-npm run test:load                                   # 20 joueurs, 120 s
+npm run test:load
 node scripts/load-test.mjs --players 20 --duration 180 --hunters 6
 ```
+Le script crée 20 sessions invitées (cache `.load-test-sessions.json`), un salon, une zone de test **simulée** (aucune vraie position), les consentements, lance la partie, envoie des positions simulées toutes les ~5 s, tente des captures, coupe/rétablit le Realtime de 3 joueurs et mesure : abonnements, messages, latence serveur→client, trous de séquence, impulsions radar, reconnexions, latence RPC, erreurs.
+Critères suggérés : 0 échec d'abonnement, latence p95 < 500 ms, aucune erreur `E_INTERNAL`, reconnexions 3/3.
 
-Le script crée 20 sessions invitées (mises en cache dans `.load-test-sessions.json`, ignoré par Git, pour respecter la limite de 30 inscriptions anonymes/heure/IP), un salon, lance une partie (radar toutes les 15 s), abonne chaque joueur à ses 3 canaux privés, joue des actions, coupe puis rétablit le Realtime de 3 joueurs à mi-parcours, puis interrompt la partie.
+## 3. Tests sur un téléphone (seul)
 
-Résultats affichés : abonnements réussis/échoués, messages reçus, **latence serveur → client** (p50/p95/max), trous/doublons de séquence, impulsions radar reçues, reconnexions, latence RPC, erreurs par code.
+Préalable : *development build* installée (DEPLOYMENT_GUIDE §1).
+1. **Autorisations** : premier lancement → écran Localisation ; refuser puis accepter ; vérifier que l'état se met à jour au retour des Réglages. Désactiver « Position exacte » → l'avertissement apparaît.
+2. **Zone** : créer un salon, chercher « parc » d'une ville, choisir un résultat, déplacer la carte, régler le rayon.
+3. **Consentement** : sans accepter les consignes, le bouton Lancer reste bloqué (message explicite).
+4. **GPS premier plan** (avec un second compte sur un autre téléphone ou un émulateur) : lancer, marcher 50 m ; le badge affiche « Partagée · ±x m » ; la position se met à jour.
 
-Critères d'acceptation suggérés : 0 échec d'abonnement, latence p95 < 500 ms, 0 erreur `E_INTERNAL`, 3/3 reconnexions cohérentes, ≈ (durée / 15) × 6 impulsions radar reçues.
+## 4. Tester les déconnexions et l'arrière-plan
 
-⚠️ Consomme du quota Realtime (quelques dizaines de milliers de messages). Le premier lancement crée 20 profils « ChargeXX » : vous pouvez les supprimer ensuite dans **Authentication → Users**.
+| Scénario | Attendu |
+|----------|---------|
+| Mode avion 20 s | badge « Hors ligne », puis retour à « Partagée » ; les autres voient la position « obsolète » puis à jour |
+| Mode avion > 45 s | les autres voient « déconnecté » |
+| Mode avion > délai d'abandon (défaut 180 s) | joueur « a quitté » ; victoire si dernier de son équipe |
+| Écran éteint 2 min (autorisation « Toujours » accordée) | Android : notification « Partage de position actif » ; la position continue d'être mise à jour chez les autres (iOS : mises à jour possiblement espacées) |
+| Écran éteint, autorisation « Toujours » refusée | bandeau d'avertissement dans le jeu ; la position devient obsolète ; reprise au retour dans l'application |
+| Application fermée (balayée) | le suivi s'arrête (comportement normal, documenté) ; à la réouverture, retour à la partie |
+| Bouton **Arrêt** | confirmation → sortie immédiate, notification Android disparue, les autres voient « a arrêté le partage » |
+| Fin de partie | le partage s'arrête seul (notification disparue, badge « Partage arrêté ») |
 
-## 3. Tester les connexions et la synchronisation (manuel, 2 appareils)
+Note : sur certains Android (Xiaomi, Huawei, Samsung…), désactivez l'optimisation de batterie pour l'application ([dontkillmyapp.com](https://dontkillmyapp.com)).
 
-1. Appareil A : créer un salon. Appareil B : rejoindre par lien.
-2. Vérifier : B apparaît chez A avec un point vert en moins d'une seconde ; « En direct » des deux côtés.
-3. A change l'équipe de B → mise à jour immédiate chez B.
-4. Activez **Réglages → Afficher le diagnostic** : les compteurs « Messages temps réel reçus » augmentent.
+## 5. Tester le radar et les captures (2 téléphones minimum)
 
-## 4. Tester le radar
-
-1. Règles : radar **Automatique**, intervalle **15 s**, précision **Secteur**, équipes **Chasseurs**.
-2. Lancer une partie avec préparation 15 s.
-3. Côté Chasseur : le panneau Radar annonce « prochaine impulsion dans 00:15 » ; à 0, balayage sonar sur la carte, rectangles pointillés sur les secteurs, ligne dans le journal, vibration.
-4. Côté Fugitif : notification « Impulsion radar adverse détectée » au même moment.
-5. Fugitif active **Brouilleur** → à l'impulsion suivante, un contact « Signal brouillé ».
-6. Variante **Manuel** : bouton Radar avec recharge ; deux appuis rapides → le second est refusé (« En recharge »).
-7. Les comptes à rebours doivent être identiques sur les deux téléphones (à ±1 s), même si l'heure d'un téléphone est volontairement décalée dans ses réglages (le chrono suit l'horloge serveur).
-
-## 5. Tester les déconnexions
-
-1. Pendant une partie, passez un téléphone en **mode avion** 20 s puis réactivez : badge « Hors ligne » puis « Reconnexion… » puis « En direct » ; l'état (position, journal, chrono) est resynchronisé.
-2. Mode avion **plus de 45 s** : les autres voient l'icône « déconnecté » à côté du joueur.
-3. Mode avion **plus que le délai d'abandon** (réglage hôte, défaut 120 s) : le joueur passe « abandon » ; si c'était le dernier de son équipe, la partie se termine.
-4. Fermer complètement l'application puis la rouvrir via l'accueil → « Vos salons » → partie en cours : retour direct dans la partie.
-5. L'hôte quitte le salon : le rôle passe au joueur présent depuis le plus longtemps (couronne).
+1. Règles : radar automatique toutes les 30 s (`interval_s` minimum), précision « Direction ».
+2. À l'impulsion : anneau sur la carte côté Chasseur, cap pointillé vers le Fugitif, « Radar : Nord-Est, ~150 m » dans le journal ; côté Fugitif : « Impulsion radar adverse détectée ».
+3. Fugitif active **Brouilleur** → impulsion suivante : « Signal brouillé ».
+4. Capture : rapprochez-vous à moins de 15 m (marcher, ne pas courir) ; « Capturer » réussit si les deux précisions GPS sont ≤ 35 m. À 40 m : « Aucun Fugitif assez proche ».
 
 ## 6. Vérifier la synchronisation
 
-- Deux Chasseurs côte à côte : le déplacement de l'un apparaît chez l'autre immédiatement (trace bleue).
-- Un Fugitif entre dans la vision d'un Chasseur : il apparaît chez **tous** les Chasseurs ; il disparaît s'il sort de la vision ou active Fantôme.
-- Un Fugitif voit tous ses coéquipiers, mais ne voit les Chasseurs que lorsqu'ils sont dans le rayon de vision de son équipe (et inversement).
-- Après la partie, la page Résultats montre toutes les positions et les trajets complets.
+- Chronos identiques (± 1 s) sur tous les téléphones, même si l'heure d'un téléphone est volontairement décalée.
+- Coéquipiers mis à jour toutes les ~5 s ; adversaires toutes les ~15 s (ou à chaque impulsion en mode « par impulsions »).
+- Panneau Joueurs : « il y a N s » cohérent ; au-delà de 45 s, « obsolète » et marqueur grisé.
 
 ## 7. Partie réelle avec plusieurs téléphones (procédure)
 
-Matériel : 4 à 20 téléphones (Android et iPhone mélangés si possible), connectés à Internet (Wi-Fi ou données mobiles, pas besoin du même réseau).
+Lieu : **parc ou espace public piéton**, à l'écart de la circulation. Groupe : 4 à 20 personnes, Android et iPhone mélangés si possible.
+1. Hôte : choisir la zone (rayon 300–500 m pour un premier test), préréglage « Quartier », partager le code.
+2. Chacun : installer l'application, rejoindre, choisir son équipe, **lire et accepter les consignes**.
+3. Lancer ; préparation 90 s (Fugitifs se dispersent).
+4. Jouer jusqu'au bout ; tester au moins : une pause/reprise, une capture, une capacité par équipe, un mode avion de 30 s, un **Arrêt** volontaire.
+5. Comparer les écrans Résultats sur plusieurs téléphones.
 
-1. **Préparation (hôte)** : application déployée, compte administrateur créé. Installez la PWA sur votre téléphone.
-2. **Créer le salon** : Accueil → Créer un salon → préréglage « Éclair » (6 min) pour un premier test.
-3. **Inviter** : bouton « Partager le lien » → envoyez-le dans votre groupe de discussion.
-4. **Chaque joueur** : ouvre le lien → Jouer en invité → pseudo → arrive dans le lobby.
-5. **Équipes** : « Répartir au hasard » (≈ 1 Chasseur pour 2–3 Fugitifs), vérifier que chacun voit sa couleur.
-6. **Lancer**. Pendant la préparation, les Fugitifs se cachent ; les Chasseurs voient « Vous partirez au signal ».
-7. **Jouer** jusqu'au bout. Pendant la partie, testez au moins une fois : pause/reprise (hôte), une capture, chaque capacité, un téléphone en mode avion 30 s.
-8. **Résultats** : chacun ouvre la page Résultats ; vérifiez que les scores sont identiques sur tous les appareils.
-9. **Retour au salon → Nouvelle partie** pour enchaîner.
-
-Fiche de relevé (à remplir pendant le test) :
-
-| Vérification | OK / KO | Remarque |
-|--------------|---------|----------|
-| Tous les joueurs ont rejoint par le lien | | |
-| Présence en ligne exacte dans le lobby | | |
-| Chrono identique sur tous les téléphones | | |
-| Impulsions radar simultanées | | |
-| Captures prises en compte immédiatement | | |
-| Reconnexion après mode avion | | |
-| Aucune information adverse visible hors règles | | |
-| Résultats identiques partout | | |
-| Interface utilisable sans zoom sur le plus petit écran | | |
-
-Ces tests manuels **n'ont pas été réalisés** pendant le développement (aucun projet Supabase ni appareil disponible).
-
-## 8. Aperçu visuel sans serveur (développement)
-
-`npm run dev` puis http://localhost:3000/dev/preview/ : écran de jeu rempli de **données fictives**, pour travailler l'interface sans backend. Cette page est désactivée dans le build de production.
+Fiche de relevé :
+| Vérification | OK/KO | Remarques (modèle de téléphone, OS) |
+|--------------|-------|-------------------------------------|
+| Installation et autorisations | | |
+| Précision GPS affichée (± m) | | |
+| Positions coéquipiers fluides | | |
+| Positions adverses approximatives et datées | | |
+| Positions obsolètes signalées | | |
+| Radar simultané et cohérent | | |
+| Captures à < 15 m acceptées | | |
+| Écran éteint : partage maintenu (Android / iOS) | | |
+| Arrêt de sécurité immédiat | | |
+| Fin de partie : partage arrêté | | |
+| Consommation batterie (% / 30 min) | | |
+| Résultats identiques | | |

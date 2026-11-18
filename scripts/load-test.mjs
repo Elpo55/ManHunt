@@ -4,8 +4,8 @@
  *
  *   node scripts/load-test.mjs [--players 20] [--duration 120] [--hunters 6]
  *
- * Variables lues dans .env.local (ou l'environnement) :
- *   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+ * Variables lues dans apps/mobile/.env (ou l environnement) :
+ *   EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY
  *
  * Ce que fait le script :
  *  1. connecte N joueurs invités (sessions mises en cache dans
@@ -13,7 +13,7 @@
  *     anonymes : 30 / heure / IP par défaut) ;
  *  2. crée un salon, fait rejoindre tout le monde, répartit les équipes, lance ;
  *  3. abonne chaque joueur à ses 3 canaux privés (public, équipe, personnel) ;
- *  4. joue des actions valides pendant la durée demandée (déplacements,
+ *  4. joue des positions GPS SIMULÉES (marche aléatoire dans une zone de test),
  *     captures, heartbeat, ticks) ;
  *  5. à mi-parcours, coupe et rétablit le Realtime de 3 joueurs (reconnexion) ;
  *  6. mesure : abonnements réussis, messages reçus, latence serveur -> client,
@@ -35,17 +35,17 @@ const PLAYERS = Math.min(20, Math.max(2, Number(args.players ?? 20)));
 const HUNTERS = Math.min(PLAYERS - 1, Math.max(1, Number(args.hunters ?? Math.round(PLAYERS * 0.3))));
 const DURATION_S = Math.max(30, Number(args.duration ?? 120));
 
-for (const f of [".env.local", ".env"]) {
+for (const f of ["apps/mobile/.env", ".env"]) {
   if (!existsSync(f)) continue;
   for (const line of readFileSync(f, "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
 }
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if (!URL || !KEY) {
-  console.error("✗ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY manquants (.env.local).");
+  console.error("✗ EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY manquants (apps/mobile/.env).");
   process.exit(2);
 }
 
@@ -121,7 +121,6 @@ function onEvent(p, msg) {
   p.seq[ev.s] = Math.max(last ?? 0, ev.sn);
   stats.latency.push(Date.now() + p.offset - ev.at);
   if (ev.t === "radar") stats.radar++;
-  if (ev.t === "move" && ev.d.u === p.uid) p.pos = { x: ev.d.x, y: ev.d.y };
 }
 
 async function subscribe(p, gameId) {
@@ -157,27 +156,23 @@ async function subscribe(p, gameId) {
 async function resync(p, gameId) {
   const v = await rpc(p, "get_game_view", { p_game: gameId });
   p.view = v;
-  p.pos = { x: v.me.x, y: v.me.y };
   p.status = v.me.status;
   p.seq = { all: v.streams.all, [v.me.team]: v.streams.team, [`p:${p.uid}`]: v.streams.p };
   return v;
 }
 
-function randomPath(p, len) {
-  const { map } = p.view.game;
-  const out = [];
-  let { x, y } = p.pos;
-  for (let k = 0; k < len; k++) {
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(
-      ([dx, dy]) => x + dx >= 0 && y + dy >= 0 && x + dx < map.w && y + dy < map.h && map.rows[y + dy][x + dx] === ".",
-    );
-    if (!dirs.length) break;
-    const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
-    x += dx;
-    y += dy;
-    out.push([x, y]);
-  }
-  return out;
+// Zone de test (positions simulées, aucune position réelle n'est utilisée).
+const ZONE = { lat: 48.8556, lng: 2.2986, radius_m: 600, label: "Test de charge", set: true };
+const M = 111320;
+function toLatLng(e, so) {
+  return { lat: ZONE.lat - so / M, lng: ZONE.lng + e / (M * Math.cos((ZONE.lat * Math.PI) / 180)) };
+}
+/** Marche aléatoire à ~1,5 m/s, bornée dans la zone. */
+function walk(p, seconds) {
+  const a = Math.random() * Math.PI * 2;
+  const d = 1.5 * seconds;
+  p.e = Math.max(-500, Math.min(500, p.e + Math.cos(a) * d));
+  p.s = Math.max(-500, Math.min(500, p.s + Math.sin(a) * d));
 }
 
 // ---------- scénario ----------
@@ -194,7 +189,7 @@ async function main() {
   const host = players[0];
   const room = await rpc(host, "create_room", {
     p_name: `Charge ${new Date().toISOString().slice(11, 19)}`,
-    p_config: { prep_s: 10, duration_s: Math.max(120, DURATION_S + 60), map_size: "l", step_regen_ms: 1000, radar: { interval_s: 15 } },
+    p_config: { prep_s: 0, duration_s: Math.max(300, DURATION_S + 120), zone: ZONE, radar: { interval_s: 30 }, position_interval_s: 5 },
     p_max_players: 20,
     p_allow_team_choice: false,
   });
@@ -203,6 +198,7 @@ async function main() {
     p.team = k < HUNTERS ? "hunter" : "fugitive";
     await rpc(host, "set_member_team", { p_room: room.room_id, p_user: p.uid, p_team: p.team });
   }
+  await Promise.all(players.map((p) => rpc(p, "set_location_consent", { p_room: room.room_id, p_consent: true })));
   const { game_id: gameId } = await rpc(host, "start_game", { p_room: room.room_id });
   console.log(`✓ Partie lancée (${gameId}), salon ${room.code}`);
 
@@ -215,7 +211,9 @@ async function main() {
   let reconnectDone = false;
   const loops = players.map(async (p, idx) => {
     await sleep(idx * 97);
-    let lastBeat = 0, lastTick = 0;
+    let lastBeat = 0, lastTick = 0, lastPos = Date.now();
+    p.e = (Math.random() - 0.5) * 600;
+    p.s = (Math.random() - 0.5) * 600;
     while (Date.now() < end) {
       try {
         if (Date.now() - lastBeat > 15000) {
@@ -229,17 +227,18 @@ async function main() {
         if (p.status === "active") {
           if (p.team === "hunter" && Math.random() < 0.2) await rpc(p, "attempt_capture", { p_game: gameId }).catch(() => {});
           else {
-            const path = randomPath(p, 1 + Math.floor(Math.random() * 2));
-            if (path.length) {
-              const r = await rpc(p, "move", { p_game: gameId, p_path: path }).catch(() => null);
-              if (r) p.pos = { x: r.x, y: r.y };
-            }
+            walk(p, (Date.now() - lastPos) / 1000);
+            lastPos = Date.now();
+            const g = toLatLng(p.e, p.s);
+            await rpc(p, "report_position", {
+              p_game: gameId, p_lat: g.lat, p_lng: g.lng, p_accuracy: 5 + Math.random() * 10, p_recorded_at: Date.now() + p.offset,
+            }).catch(() => null);
           }
         }
       } catch {
         /* erreurs comptées dans stats.errors */
       }
-      await sleep(1800 + Math.random() * 800);
+      await sleep(4500 + Math.random() * 1000);
       if (!p.status || Math.random() < 0.05) {
         const v = await resync(p, gameId).catch(() => null);
         if (v?.game.phase === "finished") return;
@@ -278,11 +277,11 @@ async function main() {
   console.log(`Messages reçus              : ${stats.received} (${(stats.received / DURATION_S).toFixed(1)} / s)`);
   console.log(`Latence serveur → client    : p50 ${r(pct(stats.latency, 0.5))} · p95 ${r(pct(stats.latency, 0.95))} · max ${r(pct(stats.latency, 1))}`);
   console.log(`Trous / doublons de séquence: ${stats.gaps} / ${stats.dups}`);
-  console.log(`Impulsions radar reçues     : ${stats.radar} (Chasseurs, toutes les 15 s)`);
+  console.log(`Impulsions radar reçues     : ${stats.radar} (Chasseurs, toutes les 30 s)`);
   console.log(`Reconnexions                : ${stats.reconnectOk}/3 (resync cohérente : ${stats.resyncConsistent})${reconnectDone ? "" : " (non terminée)"}`);
   console.log(`Appels RPC                  : ${stats.rpc.length} · p50 ${r(pct(stats.rpc, 0.5))} · p95 ${r(pct(stats.rpc, 0.95))}`);
   console.log(`Erreurs (codes)             : ${JSON.stringify(stats.errors)}`);
-  console.log("Erreurs attendues (règles)  : E_COOLDOWN, E_NOT_ENOUGH_STEPS, E_BLOCKED, E_RATE_LIMITED, E_NOT_ACTIVE");
+  console.log("Erreurs attendues (règles)  : E_COOLDOWN, E_RATE_LIMITED, E_NOT_ACTIVE, E_POSITION_REQUIRED, E_GAME_FINISHED");
   const fatal = stats.subscribeFailures > 0 || Object.keys(stats.errors).some((c) => !/^E_/.test(c) || c === "E_INTERNAL");
   console.log(fatal ? "✗ Des anomalies sont à analyser." : "✓ Aucun problème bloquant détecté.");
   process.exit(fatal ? 1 : 0);

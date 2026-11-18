@@ -1,201 +1,168 @@
 # Ce qu'il vous reste à faire
 
-Légende :
-- `[ ]` À faire par vous
-- `[x]` Déjà effectué par Claude Code (vérifié)
-- `[ ] (à vérifier)` À vérifier par vous
-- `[!]` Bloqué par une intervention externe (compte, identifiants, appareils)
+Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] (à vérifier)` à contrôler · `[!]` bloqué (compte, paiement ou appareil requis).
 
-Durée totale estimée : **1 h à 1 h 30** pour avoir le jeu en ligne, puis une soirée de test avec vos amis.
+Temps estimé jusqu'à une première partie sur Android : **1 h 30 à 2 h** (dont ~30 min d'attente de compilation EAS).
 
 ---
 
-## Déjà fait (pour information)
+## Déjà fait
 
-- [x] Projet Next.js + TypeScript + Tailwind créé, design system, 17 pages, PWA (manifeste, icônes, service worker).
-- [x] Base de données complète en 7 migrations versionnées (`supabase/migrations/`) : tables, RLS, moteur de jeu, radar, capacités, sécurité Realtime.
-- [x] 87 tests automatisés écrits et **exécutés avec succès** (unitaires + PostgreSQL réel via PGlite, dont une simulation à 20 joueurs).
-- [x] Typecheck, lint (0 erreur) et build de production réussis.
-- [x] Dépôt Git local initialisé sur la branche `main` avec commits.
-- [x] Fichiers `.env.example` et `.env.local` (vide, ignoré par Git) créés.
-- [x] Script de test de charge réel prêt (`scripts/load-test.mjs`).
+- [x] Audit, sauvegardes (`v0.1.0-web`, branche `archive/web-real-world-map`), plan de migration (docs/MIGRATION_MOBILE_GPS.md).
+- [x] Migration serveur GPS `0800` (positions privées, arrondi, consentement, zone, captures/radar/capacités GPS, arrêt de sécurité, rétention).
+- [x] Monorepo : `packages/shared` (logique testée) + `apps/mobile` (Expo SDK 58, 15 écrans).
+- [x] 78 tests automatisés **exécutés et réussis** ; typage, lint, `expo-doctor` 20/20 ; bundles JavaScript Android et iOS compilés.
+- [x] Icônes originales, permissions natives, textes d'autorisation, profils EAS (`eas.json`), `apps/mobile/.env.example`.
+- [x] Dépôt Git local à jour (branche `main`).
 
-Rien n'a été créé chez Supabase, Cloudflare ou GitHub : ces étapes exigent **vos** comptes.
-
----
-
-## 1. Comptes et services externes
-
-### 1.1 [!] Créer le compte et le projet Supabase
-- **Objectif** : héberger la base de données, l'authentification et le temps réel.
-- **Pourquoi** : c'est le serveur du jeu ; sans lui rien ne fonctionne. Bloqué tant que vous n'avez pas de compte.
-- **Actions** : [SETUP_GUIDE.md](SETUP_GUIDE.md) étapes **1 et 2** (supabase.com → *Start your project* → *New project*, plan **Free**, région Europe, mot de passe généré et conservé).
-- **À récupérer** : le mot de passe de la base, le *Project ref* (`xxxx` dans `https://xxxx.supabase.co`).
-- **Résultat attendu** : tableau de bord du projet affiché.
-- **Vérification** : l'URL `https://supabase.com/dashboard/project/xxxx` s'ouvre.
-
-### 1.2 [ ] Récupérer les deux clés publiques
-- **Objectif** : permettre à l'application de joindre votre projet.
-- **Actions** : SETUP_GUIDE **étape 3** — bouton **Connect** ou **Project Settings → Data API** (URL) et **Project Settings → API Keys** (clé *anon public* ou *Publishable key*).
-- **À récupérer** : `https://xxxx.supabase.co` et la clé publique. **Pas** la clé `service_role` / secrète.
-- **Vérification** : la clé publique commence par `eyJ` (anon) ou `sb_publishable_`.
-
-### 1.3 [ ] Configurer l'authentification
-- **Objectif** : autoriser le mode invité et les retours de connexion.
-- **Actions** : SETUP_GUIDE **étape 7** :
-  1. **Authentication → Sign In / Providers → Allow anonymous sign-ins : activé** → Save.
-  2. Fournisseur **Email** : désactiver **Confirm email** (recommandé pour un groupe privé) → Save.
-  3. **Authentication → URL Configuration** : Site URL `http://localhost:3000`, Redirect URL `http://localhost:3000/auth/callback/` (vous ajouterez l'URL de production en 3.4).
-- **Vérification** : à l'étape 2.4, « Jouer en invité » fonctionne.
-
-### 1.4 [ ] Restreindre Realtime aux canaux privés
-- **Objectif** : empêcher toute écoute hors des règles d'autorisation.
-- **Actions** : SETUP_GUIDE **étape 8** : **Realtime → Settings** → désactiver **Allow public access** → Save.
-- **Vérification** : le lobby affiche « En direct » à l'étape 2.4 (si « Reconnexion… » en boucle : relire l'étape 2.2).
-
-### 1.5 [ ] Créer un compte GitHub (si vous n'en avez pas) et un compte Cloudflare
-- **Objectif** : héberger le code (privé) et le site.
-- **Actions** : https://github.com/signup puis https://dash.cloudflare.com/sign-up (gratuits, sans carte).
-- **Vérification** : vous pouvez vous connecter aux deux.
+**Rien n'a été créé chez Supabase, Expo, Apple, Google ou GitHub, aucune application n'a été compilée en natif ni installée, aucun test sur téléphone n'a été fait** : ces étapes exigent vos comptes et vos appareils.
 
 ---
 
-## 2. Configuration locale
+## 1. Comptes externes
 
-### 2.1 [ ] Installer les dépendances
-- **Pourquoi** : `node_modules` est déjà présent sur ce PC ; à refaire seulement sur une autre machine ou après suppression.
-- **Actions** : dans un terminal à la racine du projet : `npm install`.
-- **Vérification** : « found 0 vulnerabilities » ou équivalent, pas d'erreur.
+### 1.1 [!] Supabase
+- **Objectif / utilité** : héberger le serveur du jeu (base, authentification, temps réel). Indispensable.
+- **Actions** : SETUP_GUIDE §1.1 (plan Free, région Europe, mot de passe généré et conservé).
+- **À récupérer** : URL du projet, clé publique (*anon* ou *publishable*), *Project ref*, mot de passe de la base.
+- **Vérification** : le tableau de bord du projet s'ouvre.
 
-### 2.2 [ ] Appliquer les migrations sur Supabase
-- **Objectif** : créer tables, moteur de jeu et sécurité.
-- **Actions** (SETUP_GUIDE **étape 5**, méthode A) :
-  ```bash
-  npx supabase login
-  npx supabase link --project-ref xxxx
-  npx supabase db push
-  ```
-  Ou méthode B : coller les 7 fichiers de `supabase/migrations/` dans l'ordre dans **SQL Editor** → Run.
+### 1.2 [!] Expo (expo.dev)
+- **Objectif** : compiler les applications Android/iOS dans le cloud (EAS Build, offre gratuite).
+- **Actions** : https://expo.dev/signup ; puis `cd apps/mobile && npx eas-cli@latest login`.
+- **Vérification** : `npx eas-cli whoami` affiche votre identifiant.
+
+### 1.3 [ ] GitHub (recommandé)
+- **Objectif** : sauvegarder le code hors de ce PC.
+- **Actions** : `gh auth login` puis, à la racine : `gh repo create projet-traque --private --source . --remote origin --push`.
+- **Vérification** : dépôt **privé** visible ; aucun fichier `.env` dedans (`git ls-files | grep .env` ne doit lister que `apps/mobile/.env.example`).
+
+### 1.4 [!] Apple Developer Program — **décision à prendre (99 $/an)**
+- **Objectif** : installer l'application sur des iPhone (hors App Store) et publier sur l'App Store.
+- **Pourquoi** : Apple n'autorise pas l'installation d'une application compilée dans le cloud sans ce programme. Alternative gratuite : un Mac + Xcode (installation valable 7 jours).
+- **Actions si oui** : https://developer.apple.com/programs → *Enroll* (24–48 h de validation).
+- **Vérification** : accès à https://developer.apple.com/account.
+- Tant que ce n'est pas décidé, **testez sur Android** (gratuit).
+
+### 1.5 [ ] Google Play Console (facultatif, 25 $ une fois)
+- Seulement pour publier sur le Play Store. Les APK de test se partagent gratuitement sans ce compte.
+
+### 1.6 [ ] MapTiler (facultatif)
+- **Objectif** : fournisseur de tuiles avec engagement de service si OpenFreeMap (gratuit, sans garantie) devient lent ou indisponible.
+- **Actions** : SETUP_GUIDE §2. **Vérification** : carte affichée avec `EXPO_PUBLIC_MAP_PROVIDER=maptiler`.
+
+---
+
+## 2. Configuration Supabase
+
+### 2.1 [ ] Appliquer les migrations
+- **Objectif** : créer tables, moteur GPS et sécurité.
+- **Actions** (racine du dépôt) : `npx supabase login` → `npx supabase link --project-ref xxxx` → `npx supabase db push`.
 - **Résultat attendu** : « Finished supabase db push ».
-- **Vérification** : **Table Editor** montre 13 tables, toutes « RLS enabled » ; la table `abilities` contient 6 lignes.
+- **Vérification** : Table Editor = 13 tables « RLS enabled », `abilities` = 8 lignes ; schéma `private` contient `player_positions`.
 
-### 2.3 [ ] Renseigner `.env.local`
-- **Fichier** : `.env.local` à la racine (déjà créé, valeurs vides).
-- **Actions** : remplir
-  ```
-  NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY=<clé publique>
-  NEXT_PUBLIC_APP_NAME=Projet Traque
-  ```
-- **Vérification** : `git status` ne liste pas `.env.local` (il est ignoré).
+### 2.2 [ ] Authentification
+- **Actions** : SETUP_GUIDE §1.4 — **Allow anonymous sign-ins : ON** ; **Confirm email : OFF** (recommandé).
+- **Vérification** : « Jouer en invité » fonctionne dans l'application.
 
-### 2.4 [ ] Lancer l'application en local
-- **Actions** : `npm run dev` puis ouvrir http://localhost:3000.
-- **Résultat attendu** : page d'accueil sans le message « Serveur non configuré ».
-- **Vérification** : *Commencer à jouer → Jouer en invité* → choix du pseudo → *Créer un salon* → le lobby affiche un code à 6 caractères et « En direct ».
+### 2.3 [ ] Realtime privé
+- **Actions** : SETUP_GUIDE §1.5 — désactiver **Allow public access**.
+- **Vérification** : le lobby affiche les joueurs en ligne (point vert) et se met à jour instantanément.
 
-### 2.5 [ ] (Recommandé) Lancer le test de charge réel
-- **Objectif** : mesurer latence et stabilité avec 20 clients réels.
-- **Actions** : `npm run test:load` (voir [TESTING_GUIDE.md](TESTING_GUIDE.md) §2).
-- **Vérification** : dernière ligne « ✓ Aucun problème bloquant détecté. » Envoyez-moi la sortie si ce n'est pas le cas.
+### 2.4 [ ] pg_cron (recommandé : effacement automatique des positions)
+- **Actions** : SETUP_GUIDE §1.6.
+- **Vérification** : `select jobname from cron.job;` → `pt-tick`, `pt-cleanup`.
+
+### 2.5 [ ] Compte administrateur
+- **Actions** : SETUP_GUIDE §1.7 (après votre première connexion).
+- **Vérification** : Réglages → « Administration : quotas ».
 
 ---
 
-## 3. Déploiement
+## 3. Configuration de l'application (locale)
 
-### 3.1 [ ] Pousser le code sur GitHub (dépôt privé)
-- **Actions** ([DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §1) :
-  ```bash
-  gh auth login
-  gh repo create projet-traque --private --source . --remote origin --push
-  ```
-- **Vérification** : le dépôt existe sur GitHub, en **Private**, sans fichier `.env.local`.
+### 3.1 [ ] Dépendances
+`npm install` à la racine (déjà fait sur ce PC ; à refaire ailleurs). **Vérification** : `npm test` → 78 tests réussis.
 
-### 3.2 [ ] Créer le projet Cloudflare Pages
-- **Actions** (DEPLOYMENT_GUIDE §2) : **Workers & Pages → Create → Pages → Connect to Git** → dépôt `projet-traque` → Build command `npm run build`, Build output directory `out`, Production branch `main`.
-- **Vérification** : l'écran de configuration est validé.
+### 3.2 [ ] Fichier `apps/mobile/.env`
+- **Actions** : `cp apps/mobile/.env.example apps/mobile/.env` puis renseigner `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `APP_BUNDLE_ID` (ex. `com.prenomnom.traque`, **définitif après publication**).
+- **Vérification** : `git status` ne montre pas ce fichier.
 
-### 3.3 [ ] Définir les variables de production puis déployer
-- **Actions** : dans *Environment variables* : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_APP_NAME`, `NODE_VERSION=22` → **Save and Deploy**.
-- **Résultat attendu** : déploiement « Success » et une URL `https://projet-traque.pages.dev`.
-- **Vérification** : l'URL affiche l'accueil sans « Serveur non configuré ».
-
-### 3.4 [ ] Déclarer l'URL de production dans Supabase
-- **Actions** : **Authentication → URL Configuration** : Site URL = URL Cloudflare ; ajouter `https://<votre-site>/auth/callback/` aux Redirect URLs.
-- **Vérification** : la création d'un compte e-mail depuis le site en ligne fonctionne.
-
-### 3.5 [ ] (à vérifier) Domaine
-- Par défaut `*.pages.dev` suffit. Domaine personnalisé facultatif (DEPLOYMENT_GUIDE §7).
+### 3.3 [ ] Projet EAS et variables
+- **Actions** (dans `apps/mobile`) : `npx eas-cli init` ; si demandé, définir `EAS_PROJECT_ID` ; ajouter les variables sur expo.dev (SETUP_GUIDE §4.3) pour *development, preview, production*.
+- **Vérification** : expo.dev → projet → *Environment variables* liste les 4 variables.
 
 ---
 
-## 4. Tests réels
+## 4. Android
 
-### 4.1 [!] Installer l'application sur votre téléphone
-- **Bloqué** : nécessite le site déployé (3.3) et votre téléphone.
-- **Actions** : Android/Chrome : menu ⋮ → *Installer l'application* ; iPhone/Safari : Partager → *Sur l'écran d'accueil*.
-- **Vérification** : l'icône « réticule » est sur l'écran d'accueil et s'ouvre en plein écran.
+### 4.1 [ ] Build de développement
+- **Actions** : `npx eas-cli build --profile development --platform android` ; accepter la création du *keystore* (signature conservée par EAS).
+- **Résultat** : lien/QR d'installation de l'APK (10–30 min, file gratuite).
+- **Vérification** : l'application « Projet Traque » (icône réticule) s'ouvre sur le téléphone.
 
-### 4.2 [!] Rejoindre une partie avec plusieurs appareils
-- **Bloqué** : nécessite d'autres appareils / amis.
-- **Actions** : TESTING_GUIDE §3 puis §7.
-- **Vérification** : présence en ligne et équipes synchronisées sur tous les appareils.
+### 4.2 [ ] Sauvegarder la clé de signature
+- **Pourquoi** : sans elle, impossible de mettre à jour l'application publiée.
+- **Actions** : `npx eas-cli credentials` → Android → *Download keystore* → stocker en lieu sûr (hors dépôt).
 
-### 4.3 [ ] Vérifier le radar
-- TESTING_GUIDE §4 (intervalle 15 s pour tester vite). **Vérification** : impulsions simultanées, chronos identiques.
+### 4.3 [ ] Réglages du téléphone
+- Autoriser l'installation depuis le navigateur ; dans l'application, localisation « Toujours autoriser » + **Position exacte** ; **batterie non restreinte** pour l'application.
+- **Vérification** : écran Localisation de l'application : toutes les lignes vertes.
 
-### 4.4 [ ] Tester les déconnexions
-- TESTING_GUIDE §5 (mode avion 20 s, 60 s, puis au-delà du délai d'abandon). **Vérification** : reconnexion et resynchronisation automatiques, abandon après le délai.
-
-### 4.5 [ ] Tester une partie complète
-- TESTING_GUIDE §7, en remplissant la fiche de relevé. **Vérification** : résultats identiques sur tous les appareils. Remontez-moi les lignes KO.
+### 4.4 [ ] Version à partager (preview)
+- `npx eas-cli build --profile preview --platform android` → partager le lien d'installation à vos amis Android.
 
 ---
 
-## 5. Administration
+## 5. iOS — [!] bloqué par la décision 1.4
 
-### 5.1 [ ] Créer votre compte administrateur
-- **Pourquoi** : accéder au suivi de consommation et au nettoyage.
-- **Actions** (SETUP_GUIDE §10) : jouer une fois pour créer votre profil → **Authentication → Users** → copier votre *User UID* → **SQL Editor** :
-  ```sql
-  update public.profiles set is_admin = true where id = 'VOTRE-USER-UID';
-  ```
-  Conseil : utilisez un **compte e-mail** (pas invité) pour ne pas perdre ce profil.
-- **Vérification** : **Réglages** affiche « Administration : consommation des quotas ».
-
-### 5.2 [ ] Comprendre les permissions
-- Joueurs : rejoignent, choisissent leur équipe si autorisé, jouent, quittent.
-- Hôte (créateur du salon) : règles, équipes, lancement, pause, interruption, exclusion, transfert du rôle.
-- Administrateur : uniquement la consommation et le nettoyage ; il n'a **aucun** pouvoir de triche en partie.
-- Tout est appliqué par le serveur ; voir [docs/SECURITY.md](docs/SECURITY.md).
-
-### 5.3 [ ] Comprendre la gestion des salons
-- Un hôte peut avoir 3 salons ouverts au maximum ; un salon accepte 2 à 20 joueurs.
-- Si l'hôte part (ou est inactif 3 min dans le lobby), le joueur présent depuis le plus longtemps devient hôte.
-- On ne peut pas rejoindre un salon pendant une partie ; on rejoint la suivante.
-- Les salons inactifs depuis 7 jours sont fermés par le nettoyage.
-
-### 5.4 [ ] Comprendre les limites du forfait gratuit
-- Lire [docs/QUOTAS.md](docs/QUOTAS.md). Points clés :
-  - 100 messages temps réel par seconde : gardez une régénération des pas ≥ 1 s à 20 joueurs.
-  - Environ 40 parties actives de 15 min à 20 joueurs par mois avant d'approcher 2 millions de messages (estimation).
-  - **Un projet gratuit inactif ~7 jours est mis en pause** : avant une soirée de jeu, ouvrez le tableau de bord Supabase et cliquez sur **Restore project** si nécessaire.
-  - Aucun dépassement n'est facturé sur le forfait Free.
-
-### 5.5 [ ] (Optionnel) Activer les tâches planifiées
-- SETUP_GUIDE §9 : `supabase/optional/pg_cron_jobs.sql` dans **SQL Editor**.
-- **Vérification** : `select * from cron.job;` liste `pt-tick` et `pt-cleanup`.
-
-### 5.6 [ ] (Optionnel) Choisir le nom définitif
-- Changez `NEXT_PUBLIC_APP_NAME` dans `.env.local` et dans Cloudflare, puis redéployez. Aucun nom définitif n'a été imposé.
+### 5.1 [!] Build et installation
+- **Avec le programme Apple** : `npx eas-cli device:create` (chaque iPhone de test ouvre le lien), puis `npx eas-cli build --profile development --platform ios` (EAS crée certificats et profils), installer via le lien.
+- **Avec un Mac (gratuit)** : Xcode installé, iPhone branché, `cd apps/mobile && npx expo run:ios --device`.
+- **Sur l'iPhone** : Réglages → Confidentialité et sécurité → **Mode développeur** activé ; localisation « Toujours » + « Position exacte ».
+- **Vérification** : l'application s'ouvre et l'écran Localisation est tout vert.
 
 ---
+
+## 6. Tests réels (indispensables)
+
+### 6.1 [ ] Test de charge réseau
+`npm run test:load` (après 2.x et 3.2). **Vérification** : « ✓ Aucun problème bloquant détecté. » — envoyez-moi la sortie sinon.
+
+### 6.2 [ ] Un téléphone
+TESTING_GUIDE §3 (autorisations, zone, consentement, badge GPS).
+
+### 6.3 [ ] Déconnexions et arrière-plan
+TESTING_GUIDE §4 sur **au moins un Android et (si possible) un iPhone** — c'est le point le plus dépendant des appareils.
+
+### 6.4 [ ] Radar et captures
+TESTING_GUIDE §5 avec deux téléphones.
+
+### 6.5 [ ] Partie complète
+TESTING_GUIDE §7 dans un parc, en remplissant la fiche de relevé. **Envoyez-moi les lignes KO** (modèle de téléphone, version d'OS).
+
+---
+
+## 7. Publication (facultatif, après les tests)
+
+### 7.1 [ ] Politique de confidentialité publique
+Exigée par les stores ; base : docs/SECURITY.md. À héberger sur une page web publique (ex. GitHub Pages).
+
+### 7.2 [ ] Google Play
+DEPLOYMENT_GUIDE §5 : compte (25 $), build `production`, déclaration de **localisation en arrière-plan** avec vidéo, formulaire *Sécurité des données*, test interne.
+
+### 7.3 [!] App Store
+DEPLOYMENT_GUIDE §5 : programme Apple, TestFlight, *Confidentialité de l'app*, justification de l'arrière-plan.
+
+---
+
+## 8. Administration et règles de fonctionnement
+
+- [ ] Comprendre les rôles : joueur / hôte (règles, équipes, lancement, pause, fin, exclusion) / administrateur (quotas, nettoyage — aucun pouvoir en partie).
+- [ ] Comprendre la confidentialité : partage seulement en partie, après accord ; positions arrondies ; effacement 24 h après ; bouton Arrêt.
+- [ ] Limites gratuites (docs/QUOTAS.md) : ~20–30 parties de 30 min à 20 joueurs par mois ; projet Supabase mis en pause après ~7 jours sans activité (**Restore project** avant une soirée de jeu).
+- [ ] Choisir un nom définitif quand vous le souhaitez (`EXPO_PUBLIC_APP_NAME`, puis recompiler).
 
 ## Si vous voulez que je continue
 
-Envoyez-moi :
-1. la sortie de `npx supabase db push` (ou une capture des tables) ;
-2. la sortie de `npm run test:load` ;
-3. la fiche de relevé de la première partie réelle.
-
-Ne m'envoyez **jamais** la clé `service_role` / secrète ni le mot de passe de la base.
+Envoyez : la sortie de `npx supabase db push`, celle de `npm run test:load`, la fiche de relevé de la première partie, et votre décision sur le compte Apple. **Ne m'envoyez jamais** la clé `service_role`, une *secret key*, le mot de passe de la base ni le *keystore*.

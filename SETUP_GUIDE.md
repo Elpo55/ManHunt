@@ -1,142 +1,138 @@
-# Guide de configuration des services externes
+# Guide de configuration des services
 
-Durée : 20 à 30 minutes. Coût : 0 €. Aucune carte bancaire n'est demandée par Supabase pour le forfait gratuit.
+Durée : ~45 min. Coût : 0 € (les seules options payantes, Apple et Google Play, sont signalées et facultatives au départ).
 
-> Les intitulés de menus ci-dessous correspondent à l'interface Supabase connue fin 2026. Si un libellé a légèrement changé, cherchez le terme indiqué entre guillemets dans la page.
+> Les noms de menus correspondent aux interfaces connues fin 2026. Si un libellé a changé, cherchez le terme entre guillemets dans la page.
 
 ---
 
-## 1. Créer le compte Supabase
+## 1. Supabase (serveur du jeu)
 
-1. Ouvrez https://supabase.com et cliquez sur **Start your project** (ou **Sign in**).
-2. Connectez-vous avec **Continue with GitHub** (recommandé, vous aurez besoin de GitHub pour le déploiement) ou par e-mail.
-3. Si on vous demande de créer une **organisation** : nom libre (ex. « Perso »), **Type** : *Personal*, **Plan** : **Free** → **Create organization**.
+### 1.1 Compte et projet
+1. https://supabase.com → **Start your project** → **Continue with GitHub** (ou e-mail).
+2. Organisation : **Type** *Personal*, **Plan** **Free**.
+3. **New project** : nom `projet-traque`, **Database Password** → **Generate a password** (à conserver), **Region** la plus proche de vos joueurs (ex. *West EU (Paris)*), **Create new project**.
 
-✅ Vérification : vous voyez le tableau de bord `https://supabase.com/dashboard`.
+### 1.2 Identifiants (publics)
+| Valeur | Où | Variable |
+|--------|----|----------|
+| URL | bouton **Connect** ou **Project Settings → Data API → Project URL** | `EXPO_PUBLIC_SUPABASE_URL` |
+| Clé publique | **Project Settings → API Keys** : *anon public* (onglet *Legacy API Keys*) ou *Publishable key* `sb_publishable_…` | `EXPO_PUBLIC_SUPABASE_ANON_KEY` |
 
-## 2. Créer le projet
+⚠️ Jamais la clé **service_role** ni une **Secret key** (`sb_secret_…`). Notez aussi le *Project ref* (`xxxx` dans `https://xxxx.supabase.co`).
 
-1. **New project**.
-2. Renseignez :
-   - **Organization** : celle créée ci-dessus (plan Free).
-   - **Project name** : par exemple `projet-traque`.
-   - **Database Password** : cliquez sur **Generate a password** et **conservez-le** dans un gestionnaire de mots de passe (utile pour la CLI).
-   - **Region** : la plus proche de vos joueurs (ex. *West EU (Paris)* ou *Central EU (Frankfurt)*).
-   - Laissez les options de sécurité par défaut (Data API activée).
-3. **Create new project** et patientez 1 à 2 minutes.
-
-✅ Vérification : la page du projet affiche « Project is ready » / l'écran d'accueil du projet.
-
-## 3. Récupérer les identifiants
-
-Vous avez besoin de **deux valeurs publiques** :
-
-| Valeur | Où la trouver | Variable |
-|--------|---------------|----------|
-| URL du projet | bouton **Connect** en haut de la page du projet, ou **Project Settings → Data API → Project URL** | `NEXT_PUBLIC_SUPABASE_URL` |
-| Clé publique | **Project Settings → API Keys** : onglet *Legacy API Keys* → **anon public**, ou la clé **Publishable key** (`sb_publishable_…`) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-
-⚠️ Ne copiez **jamais** la clé **service_role** ni une **Secret key** (`sb_secret_…`) : elles contournent toute la sécurité.
-
-Notez aussi le **Project ref** : la partie `xxxx` de `https://xxxx.supabase.co` (utile pour la CLI).
-
-## 4. Placer les clés (développement local)
-
-1. À la racine du projet, le fichier `.env.local` existe déjà avec des valeurs vides (sinon : copiez `.env.example` en `.env.local`).
-2. Remplissez :
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...   (ou sb_publishable_...)
-   NEXT_PUBLIC_APP_NAME=Projet Traque
-   ```
-3. Ce fichier est ignoré par Git : il ne sera jamais publié.
-
-## 5. Appliquer les migrations (créer la base de données)
-
-Les migrations créent les tables, le moteur de jeu, la sécurité et le catalogue des capacités. Deux méthodes, **choisissez-en une**.
-
-### Méthode A — CLI Supabase (recommandée)
-
-Dans un terminal, à la racine du projet :
-
+### 1.3 Créer la base (migrations)
+À la racine du dépôt :
 ```bash
-npx supabase login                         # ouvre le navigateur pour autoriser la CLI
-npx supabase link --project-ref xxxx       # remplacez xxxx ; demande le mot de passe de la base (étape 2)
-npx supabase db push                       # applique supabase/migrations/* dans l'ordre
+npx supabase login
+npx supabase link --project-ref xxxx      # mot de passe de la base demandé
+npx supabase db push                      # applique supabase/migrations/0100 → 0800
+```
+Sans terminal : **SQL Editor → New query**, collez chaque fichier de `supabase/migrations/` **dans l'ordre** (0100 à 0800), **Run** à chaque fois.
+
+✅ **Table Editor** : 13 tables publiques, toutes « RLS enabled » ; `abilities` contient 8 lignes (dont 2 désactivées : `sprint`, `barrier`). Le schéma `private` contient `player_positions` et `position_history`.
+
+### 1.4 Authentification
+1. **Authentication → Sign In / Providers** :
+   - **Allow anonymous sign-ins** : **activé** (mode invité).
+   - **Email** : laissez activé ; désactivez **Confirm email** pour un groupe d'amis (le service d'e-mail intégré n'envoie que quelques messages par heure, et le lien de confirmation n'ouvre pas l'application).
+2. **Authentication → Rate Limits** (facultatif) : augmentez « anonymous users » si beaucoup d'amis s'inscrivent depuis le même Wi-Fi.
+
+### 1.5 Realtime
+**Realtime → Settings** (ou **Project Settings → Realtime**) : désactivez **Allow public access** → **Save**. Les canaux privés et leurs autorisations sont créés par les migrations.
+
+### 1.6 Tâches planifiées (recommandé pour la confidentialité)
+**Database → Extensions → pg_cron → Enable**, puis **SQL Editor** : collez `supabase/optional/pg_cron_jobs.sql` → **Run**. Effet : effacement automatique quotidien des positions brutes (> 24 h après la partie) et fin des parties abandonnées par tous.
+
+### 1.7 Compte administrateur
+Après votre première connexion dans l'application : **Authentication → Users** → copiez votre *User UID*, puis **SQL Editor** :
+```sql
+update public.profiles set is_admin = true where id = 'VOTRE-USER-UID';
+```
+L'écran **Réglages** affiche alors la consommation des quotas.
+
+---
+
+## 2. Cartographie
+
+Rien à faire par défaut : **OpenFreeMap** (tuiles OpenStreetMap, sans compte ni clé) est utilisé.
+
+Option plus robuste (fournisseur avec engagement de service) — **MapTiler** :
+1. https://cloud.maptiler.com → compte gratuit → **API Keys** → copiez la clé.
+2. Restreignez-la : *Allowed HTTP origins / app identifiers* → votre identifiant d'application (`APP_BUNDLE_ID`).
+3. Variables : `EXPO_PUBLIC_MAP_PROVIDER=maptiler`, `EXPO_PUBLIC_MAPTILER_KEY=…`.
+
+Serveur personnel (Protomaps/OpenMapTiles compatible) : `EXPO_PUBLIC_MAP_PROVIDER=custom`, `EXPO_PUBLIC_MAP_TILES_URL=<TileJSON>`.
+
+---
+
+## 3. Variables de l'application
+
+### Développement
+```bash
+cp apps/mobile/.env.example apps/mobile/.env
+```
+Renseignez `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `APP_BUNDLE_ID` (identifiant unique à vous, ex. `com.prenomnom.traque` — **définitif une fois publié**). Ce fichier est ignoré par Git.
+
+### Builds EAS
+Les variables `EXPO_PUBLIC_*` sont intégrées **au moment de la compilation**. Définissez-les sur expo.dev (étape 4.3) pour les environnements *development*, *preview* et *production*.
+
+---
+
+## 4. Expo / EAS (compilation des applications)
+
+### 4.1 Compte
+https://expo.dev/signup (gratuit). Dans un terminal :
+```bash
+cd apps/mobile
+npx eas-cli@latest login
+npx eas-cli@latest init        # crée le projet sur expo.dev et l'identifiant EAS
+```
+Si `init` propose d'écrire `extra.eas.projectId`, acceptez ; sinon définissez `EAS_PROJECT_ID` (l'identifiant affiché).
+
+### 4.2 Identifiant d'application
+`APP_BUNDLE_ID` doit être identique dans `.env` et dans les variables EAS. Pour iOS il doit être unique dans l'App Store, pour Android dans Google Play.
+
+### 4.3 Variables sur expo.dev
+**expo.dev → projet → Environment variables → Add** (visibilité *Plain text*, environnements *development, preview, production*) : `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_APP_NAME`, `APP_BUNDLE_ID` (+ variables de carte si utilisées). Ou en ligne de commande :
+```bash
+npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_URL --value https://xxxx.supabase.co --environment development --environment preview --environment production --visibility plaintext
 ```
 
-Répondez `Y` à la confirmation. ✅ Le message se termine par « Finished supabase db push ».
+---
 
-### Méthode B — Éditeur SQL (sans terminal)
+## 5. Android
 
-1. Menu de gauche **SQL Editor** → **New query**.
-2. Ouvrez dans l'ordre chaque fichier de `supabase/migrations/` (du `…000100…` au `…000700…`), copiez tout son contenu, collez, cliquez **Run**. Attendez « Success. No rows returned » avant de passer au suivant.
-3. Ne relancez pas deux fois le même fichier.
+Aucun compte payant n'est nécessaire pour jouer entre amis.
+- **Signature** : au premier `eas build -p android`, répondez **Yes** à « Generate a new Android Keystore? » : EAS crée et conserve la clé. (Téléchargez-en une sauvegarde : `npx eas-cli credentials` → Android → *Download keystore*.)
+- **Permissions** déclarées automatiquement : localisation précise/approximative, arrière-plan, service de premier plan (localisation), vibration.
+- **Sur le téléphone** : autoriser l'installation d'applications de sources inconnues pour le navigateur utilisé ; dans l'application, accorder « Toujours autoriser » et **désactiver l'optimisation de batterie** pour l'application (Paramètres → Applications → Projet Traque → Batterie → *Non restreinte*), sinon certains constructeurs coupent le suivi.
 
-✅ Vérification (les deux méthodes) : **Table Editor** liste les 13 tables `profiles`, `rooms`, `room_members`, `room_bans`, `games`, `player_states`, `game_events`, `abilities` (6 lignes), `ability_usage`, `radar_pulses`, `map_effects`, `game_statistics`, `saved_game_configs`. Chaque table affiche le badge **RLS enabled** (aucune ne doit être marquée « RLS disabled » / « Unrestricted »).
+## 6. iOS
 
-## 6. Politiques de sécurité
+⚠️ **Décision à prendre** : installer une application sur un iPhone hors App Store exige
+- soit l'**Apple Developer Program (99 $/an)** → builds EAS internes (ad hoc) et TestFlight ;
+- soit un **Mac** avec Xcode et un identifiant Apple gratuit → `npx expo run:ios --device` (installation valable 7 jours).
 
-Les politiques RLS et les politiques Realtime sont **créées par les migrations** : rien à saisir à la main.
+Avec le programme payant :
+1. https://developer.apple.com/programs → inscription (validation 24–48 h).
+2. `npx eas-cli build -p ios --profile development` → connectez-vous à Apple quand demandé ; EAS crée certificats et profils (répondez **Yes**).
+3. Enregistrez les iPhone de test : `npx eas-cli device:create` (lien à ouvrir sur chaque iPhone), puis relancez le build.
+4. Sur l'iPhone : **Réglages → Confidentialité et sécurité → Mode développeur → activé** (pour les builds de développement).
+5. Dans l'application : autoriser la localisation, puis « Toujours » quand iOS le propose, et activer **Position exacte**.
 
-Contrôle : **Authentication → Policies** (ou **Database → Policies**) : chaque table `public.*` a au moins une politique ; le schéma `realtime` contient `realtime_read_authorized_topics` et `realtime_write_presence` sur `messages`.
-
-## 7. Authentification
-
-1. **Authentication → Sign In / Providers** (parfois **Authentication → Providers**) :
-   - Section **User Signups** : **Allow anonymous sign-ins** → **activé** (indispensable pour le mode invité). **Save**.
-   - Fournisseur **Email** : laissez activé. Pour un groupe d'amis, désactivez **Confirm email** (sinon chaque inscription envoie un e-mail via le service intégré, limité à quelques messages par heure). **Save**.
-2. **Authentication → URL Configuration** :
-   - **Site URL** : en local `http://localhost:3000` ; après déploiement, l'URL Cloudflare (ex. `https://projet-traque.pages.dev`).
-   - **Redirect URLs** → **Add URL** : `http://localhost:3000/auth/callback/` et, après déploiement, `https://<votre-site>/auth/callback/`.
-3. (Optionnel) **Authentication → Rate Limits** : « Rate limit for anonymous users » = 30/heure par IP par défaut. Augmentez-le (ex. 100) si beaucoup d'amis s'inscrivent depuis le même Wi-Fi.
-4. (Optionnel) **Authentication → Attack Protection** : CAPTCHA si le lien circule hors de votre cercle.
-
-## 8. Realtime
-
-1. Ouvrez **Realtime → Settings** (selon la version : **Project Settings → Realtime**).
-2. Désactivez **Allow public access** (« Channel restrictions » / « Private channels only ») pour que seuls les canaux privés autorisés par les politiques soient utilisables. **Save**.
-3. Aucune autre configuration : les messages sont envoyés par la base (`realtime.send`), il n'y a pas de réplication de table à activer.
-
-✅ Vérification : après une partie de test, **Realtime → Inspector** permet de rejoindre un canal ; un canal privé sans autorisation doit être refusé.
-
-## 9. (Optionnel) Tâches planifiées
-
-Pour que les parties se terminent même si tout le monde ferme l'application, et pour le nettoyage nocturne :
-
-1. **Database → Extensions** → recherchez **pg_cron** → **Enable** (si ce n'est pas déjà fait).
-2. **SQL Editor** → collez `supabase/optional/pg_cron_jobs.sql` → **Run**.
-
-Coût : une requête toutes les 15 s, négligeable.
-
-## 10. Créer votre compte administrateur
-
-1. Lancez l'application (local ou en ligne), connectez-vous, choisissez votre pseudo.
-2. Supabase → **Authentication → Users** : copiez votre **User UID**.
-3. **SQL Editor** :
-   ```sql
-   update public.profiles set is_admin = true where id = 'VOTRE-USER-UID';
-   ```
-4. Rechargez l'application : **Réglages** affiche « Administration : consommation des quotas ».
-
-## 11. Connecter le frontend
-
-- **Local** : `.env.local` (étape 4) puis `npm run dev`.
-- **Production** : variables d'environnement Cloudflare Pages (voir [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)).
-
-✅ Vérification : la page d'accueil n'affiche plus « Serveur non configuré » ; **Jouer en invité** mène à la création du profil.
-
-## 12. Déployer
-
-Suivez [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
+## 7. Vérification de bout en bout
+1. Compilez et installez la *development build* (DEPLOYMENT_GUIDE.md §1).
+2. `npm run mobile` puis ouvrez l'application → **Commencer → Jouer en invité** → pseudo → écran des autorisations.
+3. **Créer un salon** → choisir une zone → lobby avec code. ✅ Pas de message « Serveur non configuré ».
 
 ## Dépannage
-
-| Symptôme | Cause probable | Solution |
-|----------|----------------|----------|
-| « Serveur non configuré » | variables absentes | étape 4 / variables Cloudflare, puis relancer `npm run dev` ou redéployer |
-| « La connexion invité est désactivée » | anonymous sign-ins désactivé | étape 7.1 |
-| « Erreur : Could not find the function public.create_room » | migrations non appliquées | étape 5 |
-| Le lobby ne se met pas à jour / « Reconnexion… » en boucle | politiques Realtime absentes, ou canal public forcé | vérifier la migration 0600 ; étape 8 |
-| « Trop de tentatives » à l'inscription | limite d'inscriptions anonymes par IP | étape 7.3 |
-| Projet inaccessible après une semaine sans jeu | projet gratuit mis en pause | tableau de bord → **Restore project** |
+| Symptôme | Solution |
+|----------|----------|
+| « Serveur non configuré » | variables `EXPO_PUBLIC_*` absentes **au moment du build** : corrigez `.env`/EAS puis recompilez (ou relancez `npm run mobile` en développement) |
+| « Le mode invité est désactivé » | étape 1.4 |
+| `Could not find the function public.report_position` | migrations non appliquées (1.3) |
+| Lobby bloqué sur « Reconnexion… » | étape 1.5, migration 0600/0700 |
+| Carte noire sans rues | réseau ou fournisseur de tuiles indisponible ; essayez `EXPO_PUBLIC_MAP_PROVIDER=maptiler` |
+| Position « obsolète » écran éteint | autorisation « Toujours » absente ou optimisation de batterie active (5, 6) |
+| Projet inaccessible après une semaine | projet gratuit en pause : tableau de bord → **Restore project** |

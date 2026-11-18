@@ -1,134 +1,64 @@
-# Architecture
-
-Ce document décrit l'architecture technique et les décisions importantes (avec leur justification).
-
-## Vue d'ensemble
+# Architecture (v0.2 — mobile GPS)
 
 ```
- Téléphones / navigateurs (2 à 20 joueurs)
- ┌──────────────────────────────────────────┐
- │ Application web statique (Next.js export) │  ← Cloudflare Pages (CDN, gratuit)
- │  - interface, carte canvas, contrôles     │
- │  - GameController : état, séquenceur,     │
- │    horloge serveur, resynchronisation     │
- └───────────────┬──────────────────────────┘
-        HTTPS (RPC)│   WebSocket (Realtime, canaux PRIVÉS)
- ┌───────────────▼──────────────────────────┐
- │ Supabase                                  │
- │  Auth (invités anonymes + e-mail)         │
- │  PostgREST → fonctions RPC security definer│ ← AUTORITÉ DU JEU
- │  PostgreSQL : tables + RLS                 │
- │  Realtime Broadcast (émis depuis la base) │
- └───────────────────────────────────────────┘
+ Téléphone (Expo / React Native)                         Supabase
+ ┌───────────────────────────────────┐   HTTPS RPC   ┌──────────────────────────────────┐
+ │ expo-location (GPS)               │──────────────►│ PostgreSQL : fonctions security  │
+ │  ├ premier plan : watchPosition   │  report_      │ definer = AUTORITÉ DU JEU        │
+ │  └ arrière-plan : tâche + service │  position     │  - valide position, zone, vitesse│
+ │ GameController (packages/shared)  │               │  - arrondit avant diffusion      │
+ │  - séquenceur, horloge serveur    │◄──────────────│  - captures, radar, capacités    │
+ │ MapLibre natif + tuiles OSM       │  WebSocket    │ Realtime Broadcast (canaux privés│
+ └───────────────────────────────────┘  (Realtime)   │ autorisés par RLS)               │
+                                                     │ private.player_positions (brut)  │
+                                                     └──────────────────────────────────┘
 ```
 
-Aucun serveur applicatif permanent, aucun serveur local, aucune dépendance au NAS.
+## Décisions
 
-## Décisions techniques
+| # | Décision | Justification |
+|---|----------|---------------|
+| M1 | **Expo SDK 58 + React Native**, *development builds* | Une base TypeScript pour Android et iOS, réutilisation de la logique existante, modules natifs de localisation/tâches/stockage sécurisé, compilation iOS sans Mac via EAS. Expo Go exclu (MapLibre natif, arrière-plan). |
+| M2 | **MapLibre React Native 11** + tuiles **OpenStreetMap** vectorielles | Rendu natif fluide, même spécification de style que le web : le style sombre « Nocturne » est partagé. |
+| M3 | **Fournisseur de tuiles interchangeable** (`EXPO_PUBLIC_MAP_PROVIDER`) | OpenFreeMap (défaut, sans clé, sans garantie), MapTiler (clé, offre gratuite limitée), serveur personnel. `tile.openstreetmap.org` exclu (politique OSMF). |
+| M4 | **Monorepo npm** (`apps/mobile`, `packages/shared`) | Logique pure testée une seule fois (Vitest) et consommée par l'application. |
+| M5 | Serveur = **PostgreSQL RPC** (conservé) | Atomicité, verrous par partie, aucune infrastructure supplémentaire, testable avec PGlite. |
+| M6 | Positions brutes dans le **schéma privé**, diffusion **arrondie** | Confidentialité par conception (voir SECURITY.md). |
+| M7 | **Consentement côté serveur** | Le serveur refuse le lancement et toute position sans accord enregistré. |
+| M8 | **Client web retiré** (étiquette `v0.1.0-web`) | Un client web ne peut pas suivre en arrière-plan ; l'administration (quotas, nettoyage) est dans l'application et le tableau de bord Supabase. |
+| M9 | Envoi de **la position la plus récente seulement** | Pas de file hors ligne : des positions anciennes seraient trompeuses et rejetées par l'anti-triche. |
 
-| # | Décision | Pourquoi |
-|---|----------|----------|
-| D1 | **Next.js 16 en export statique** (`output: "export"`) | Seule configuration Next.js 100 % compatible Cloudflare Pages gratuit sans adaptateur (`@cloudflare/next-on-pages` est déprécié ; OpenNext cible Workers). Toute la logique serveur est dans Supabase, aucun rendu serveur n'est nécessaire. |
-| D2 | **Routes à paramètres** (`/lobby/?room=…`, `/game/?id=…`) | L'export statique interdit les routes dynamiques sans liste connue au build. |
-| D3 | **Logique de jeu en fonctions PostgreSQL** (RPC `security definer`) plutôt qu'en Edge Functions | Transactions atomiques et verrous natifs (`FOR UPDATE`), latence minimale (pas d'aller-retour Edge→DB), aucun quota d'invocations, testable localement avec PGlite. Les Edge Functions ne sont pas nécessaires au MVP. |
-| D4 | **Ticks paresseux** au lieu d'une boucle serveur | Sans serveur permanent, les échéances (fin de préparation, radar, fin de partie, abandons) sont résolues par `private.tick()` : appelée au début de chaque action, par `game_tick()` que chaque client déclenche juste après l'échéance (avec gigue), et par le heartbeat (15 s). Idempotente et sérialisée par verrou. Option : `supabase/optional/pg_cron_jobs.sql` pour faire avancer les parties même sans aucun client. |
-| D5 | **Broadcast émis depuis la base** (`realtime.send`) | Les messages ne partent que si la transaction réussit : pas d'événement fantôme. Les clients n'ont **aucun** droit de diffusion (politique RLS). |
-| D6 | **Topics par audience** : `game:<id>:all`, `game:<id>:hunter`, `game:<id>:fugitive[:e<n>]`, `game:<id>:p:<uid>`, `room:<id>` | L'isolation des équipes est garantie par l'autorisation Realtime (RLS sur `realtime.messages`), pas par le client. |
-| D7 | **Numéros de séquence par flux** | Détection des doublons, des messages en retard et des trous → resynchronisation complète via `get_game_view`. |
-| D8 | **Déplacements par « pas » régénérés** (réserve configurable) | Un déplacement multi-cases = 1 message. Limite naturellement le débit Realtime (quota gratuit : 100 msg/s). |
-| D9 | **Visibilité diffusée uniquement sur changement** | `refresh_vis` compare avec la dernière liste envoyée. |
-| D10 | **Carte générée côté serveur** (graine, bâtiments, zones interdites, connexité garantie par BFS) | Le client ne peut pas tricher sur la carte ; la carte n'est pas secrète. |
-| D11 | **Avatars géométriques générés** | Aucun stockage de fichiers (quota), identité visuelle originale. |
-| D12 | **Rotation du topic Fugitif** (mode Infection) | L'autorisation Realtime n'est vérifiée qu'à l'abonnement : un joueur infecté pourrait sinon garder l'écoute de son ancienne équipe. |
-| D13 | **Nom provisoire configurable** `NEXT_PUBLIC_APP_NAME` (défaut « Projet Traque ») | Aucun nom définitif validé. Le manifeste PWA est régénéré au build. |
+## Flux d'une position
+
+1. Le GPS fournit une mesure (premier plan : `watchPositionAsync`, intervalle de la partie ; arrière-plan : `startLocationUpdatesAsync`).
+2. `GameController.submitFix` l'affiche immédiatement (« moi ») et envoie la plus récente via `report_position`, avec l'horodatage recalé sur l'horloge serveur.
+3. Le serveur vérifie : participant, partie non terminée, joueur actif, **consentement**, coordonnées valides, horodatage (−2 min / +15 s), ordre, **vitesse plausible**, puis enregistre la position brute (privée).
+4. Diffusion : coéquipiers (`pos`, arrondi 10 m) à chaque envoi ; adversaires (`enemy_pos`, arrondi `max(approx_m, précision GPS)`) au plus toutes les `enemy_refresh_s` (mode régulier) ou à chaque impulsion (mode impulsions). Fantôme = masqué ; Brouilleur = 150 m ; Leurre = position décalée ; préparation = Fugitifs invisibles des Chasseurs.
+5. Zone : sortie signalée à tous (`zone_status`) ; Fugitif hors zone au-delà du délai → éliminé ; Chasseur hors zone → capture refusée.
 
 ## Machine à états
 
-```
- Salon (room.status)          Partie (games.phase)
- ┌───────┐ start_game  ┌─────────────┐ échéance ┌─────────┐  fin / victoire  ┌──────────┐
- │ lobby ├────────────►│ preparation ├─────────►│ running ├─────────────────►│ finished │
- └───▲───┘ (prep=0 ──► running)  │ ▲ pause/resume │  ▲                     └────┬─────┘
-     │                            ▼ │              ▼  │                          │
-     │                         ┌──────┐◄───────────┘  │                          │
-     │                         │paused├───────────────┘ abort ─► finished         │
-     │  return_to_lobby        └──────┘                                          ▼
-     └──────────────────────────────────────────── results (room.status) ◄───────┘
-```
-
-Toutes les transitions sont validées par le serveur (`E_INVALID_TRANSITION`). La même table est reproduite dans `src/lib/engine/rules.ts` (tests unitaires).
-
-## Modèle de données (résumé)
-
-| Table | Rôle | Lecture (RLS) | Écriture |
-|-------|------|---------------|----------|
-| `profiles` | pseudo, avatar, agrégats de stats, `is_admin` | tous les connectés | RPC `update_my_profile`, fin de partie |
-| `rooms` | salon, code, hôte, config | membres | RPC |
-| `room_members` | appartenance, équipe, prêt, dernier signe de vie | membres | RPC |
-| `room_bans` | exclusions définitives | hôte | RPC |
-| `games` | partie : phase, config figée, carte, échéances | participants / membres (colonnes techniques masquées) | RPC |
-| `player_states` | position, pas, effets, statut | soi + coéquipiers ; tout le monde après la fin | RPC |
-| `game_events` | journal append-only par flux (`stream`, `sn`) | flux autorisés ; tout après la fin | RPC |
-| `abilities` | catalogue des capacités | tous | migration |
-| `ability_usage` | activations (recharge, utilisations) | équipe ; tout après la fin | RPC |
-| `radar_pulses` | impulsions radar calculées (unicité `(game, team, index)`) | équipe ; tout après la fin | RPC |
-| `map_effects` | cases bloquées temporaires | participants | RPC |
-| `game_statistics` | résultat individuel figé | tous les connectés | fin de partie |
-| `saved_game_configs` | configurations enregistrées | propriétaire | propriétaire (max 20) |
-| `private.rate_limits`, `private.usage_daily` | limitation de fréquence, compteurs d'usage | personne | serveur |
-
-Migrations versionnées : `supabase/migrations/2026111800XXXX_*.sql`, à appliquer dans l'ordre.
-
-## Synchronisation
-
-**Événementielle** (immédiate) : connexion/déconnexion, déplacement, capture, capacité, changement de phase, fin de partie.
-
-**Périodique** (référence temporelle serveur) : impulsions radar automatiques à `next_radar_at`, fin de préparation, fin de partie, expiration des effets.
-
-Côté client (`src/lib/game/controller.ts`) :
-1. `get_game_view` → état complet autorisé + positions des flux.
-2. Abonnement aux 3 canaux privés ; à chaque (ré)abonnement → resynchronisation.
-3. Chaque message passe dans `StreamSequencer` : doublon/retard → ignoré ; trou → mise en attente puis resynchronisation après 1,5 s.
-4. Horloge : `server_time()` (échantillons NTP simplifiés) ; tous les chronomètres utilisent `clock.now()`.
-5. Reconnexion : backoff exponentiel par canal, resynchronisation au retour au premier plan / retour du réseau.
-
-## Règles de jeu (mode Classique)
-
-- Préparation : les Fugitifs se déplacent, les Chasseurs sont immobiles et aveugles.
-- Déplacement 4 directions, chemin validé case par case (obstacles, zones interdites, cases bloquées, bornes).
-- Pas : réserve `max_steps`, +1 toutes les `step_regen_ms` (×2 sous Accélération).
-- Vision : disque `dx² + dy² ≤ r² + r` autour de chaque coéquipier actif (Fantôme = invisible).
-- Capture : action explicite d'un Chasseur ; capture tous les Fugitifs actifs à distance de Tchebychev ≤ `capture_range` (même invisibles). Recharge après chaque tentative.
-- Victoire : Chasseurs si plus aucun Fugitif actif ; Fugitifs si le temps s'écoule avec au moins un survivant, ou si tous les Chasseurs ont abandonné ; égalité si plus personne / interruption.
-- Score : Chasseur = 100 × captures + 200 si victoire ; Fugitif = secondes de survie + 300 si encore libre à la fin + 100 si victoire ; abandon = 0.
-- Infection : le Fugitif capturé devient Chasseur (mêmes conditions de victoire).
+Inchangée (lobby → préparation → partie ⇄ pause → terminée → résultats), validée par le serveur. Le suivi GPS n'est actif que dans `preparation`, `running` et `paused`, pour un joueur `active`.
 
 ## Radar
 
-- Automatique (toutes les `interval_s`, origine = barycentre de l'équipe) ou manuel (recharge et utilisations par équipe, origine = joueur).
-- Précisions : **direction** (8 caps + bande de distance), **secteur** (grille 3×3 ou 4×4), **zone** (carré décalé aléatoirement contenant la cible).
-- Les contacts sont anonymes et mélangés ; un Fugitif sous Brouilleur apparaît « Signal brouillé ».
-- L'équipe adverse reçoit `radar_ping` (sait qu'une impulsion a eu lieu, sans le résultat).
+Calculé par le serveur à partir des positions brutes fraîches : `direction` (cap 8 directions + distance arrondie à 50 m, depuis le barycentre de l'équipe ou le joueur en mode manuel), `sector` (8 secteurs centrés sur les points cardinaux × centre/périphérie de la zone), `zone` (cercle de ≥ 100 m contenant la cible, centre décalé au hasard). Contact `lost` si aucune position fraîche, `jammed` sous Brouilleur.
 
-## Capacités (MVP : 3 + 3)
+## Capture
 
-| Capacité | Équipe | Effet | Défaut |
-|----------|--------|-------|--------|
-| Fantôme | Fugitifs | invisible sur la carte adverse (pas au radar ni au Scan) | 12 s, recharge 75 s, 2 utilisations |
-| Brouilleur | Fugitifs | radar et Traqueur adverses brouillés | 45 s, 120 s, 2 |
-| Accélération | Fugitifs | +2 pas, régénération ×2 | 15 s, 60 s, illimité |
-| Scan | Chasseurs | révèle les Fugitifs dans un rayon 2 autour d'une case à ≤ 7 ; alerte les Fugitifs repérés | 8 s, 45 s, illimité |
-| Traqueur | Chasseurs | cap + distance du Fugitif le plus proche | instantané, 60 s, 3 |
-| Blocage | Chasseurs | ferme une case à ≤ 4 pour tous | 40 s, 50 s, illimité |
+Chasseur actif, dans la zone, position < 20 s et précision ≤ `max_accuracy_m` ; Fugitif(s) à ≤ `capture_radius_m` avec positions fraîches et précises → capturé(s). Recharge après chaque tentative.
 
-Ajouter une capacité : ligne dans `public.abilities` (migration), branche dans `use_ability`, métadonnées dans `src/lib/engine/rules.ts` et `ABILITY_DEFAULTS`.
+## Modes
 
-## Ajouter un mode de jeu
+Classique (complet) et Infection (le capturé devient Chasseur, rotation du topic Fugitif). Mister X / Royale : structure de configuration prête (registre `MODES`), non développés.
 
-1. Ajouter la valeur à `games_mode_check` et à `normalize_config` (migration).
-2. Brancher la règle spécifique (`attempt_capture`, `check_victory`, `tick` pour une zone qui se resserre…).
-3. Passer `available: true` dans `MODES` (`src/lib/engine/rules.ts`).
+## Fichiers clés
 
-## Règle de transfert d'hôte
-
-Quand l'hôte quitte le salon (ou est inactif plus de 3 minutes en lobby), le rôle passe au **membre restant le plus ancien** (`joined_at` le plus petit). Si le salon est vide, il est fermé. L'hôte peut aussi transmettre le rôle manuellement.
+| Fichier | Rôle |
+|---------|------|
+| `supabase/migrations/20261118000800_real_world_gps.sql` | modèle GPS, confidentialité, consentement, radar/captures/capacités GPS, rétention |
+| `packages/shared/src/controller.ts` | contrôleur de partie (séquences, resynchronisation, envoi GPS) |
+| `packages/shared/src/layers.ts` | couches cartographiques (zone, joueurs, précision, radar) |
+| `apps/mobile/src/lib/location/tracking.ts` | suivi GPS premier plan / arrière-plan, arrêts automatiques |
+| `apps/mobile/src/app/game/[id]/index.tsx` | écran de jeu |
+| `apps/mobile/app.config.ts` | permissions natives et plugins |

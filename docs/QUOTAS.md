@@ -1,53 +1,43 @@
-# Quotas des services gratuits et consommation estimée
+# Quotas et coûts (v0.2 — mobile)
 
-> Les chiffres des fournisseurs évoluent. Vérifiez-les sur les pages officielles avant de vous y fier :
-> [Supabase – Realtime limits](https://supabase.com/docs/guides/realtime/limits), [Supabase – Realtime quotas](https://supabase.com/docs/guides/realtime/quotas), [Supabase – Pricing](https://supabase.com/pricing), [Cloudflare Pages – limits](https://developers.cloudflare.com/pages/platform/limits).
+> Les offres évoluent : vérifiez les pages officielles avant de vous y fier. Chiffres relevés en novembre 2026.
 
-## Supabase (forfait Free)
+## Supabase (Free)
 
-| Ressource | Limite gratuite (à vérifier) | Usage du jeu |
-|-----------|------------------------------|--------------|
-| Connexions Realtime simultanées | 200 (doc officielle) | 1 connexion WebSocket par joueur (3 à 4 canaux dessus) → 20 joueurs ≈ 20 connexions |
-| Messages Realtime par seconde | 100 (doc officielle) ; au-delà, des connexions sont coupées | voir estimation ci-dessous |
-| Messages Realtime par mois | ~2 millions selon des sources tierces | voir estimation |
-| Base de données | ~500 Mo selon des sources tierces | ~1–2 Mo par partie de 20 joueurs × 15 min (événements) |
-| Utilisateurs actifs (Auth) | large (dizaines de milliers) | négligeable |
-| Inscriptions anonymes | 30 / heure / IP par défaut (réglable) | 1 par nouvel appareil |
-| E-mails du service intégré | très limités (quelques-uns par heure) | uniquement pour les comptes e-mail |
-| **Mise en pause** | un projet gratuit inactif ~7 jours est mis en pause | le relancer depuis le tableau de bord (voir REMAINING_TASKS) |
+| Ressource | Limite | Usage du jeu |
+|-----------|--------|--------------|
+| Connexions Realtime simultanées | 200 ([doc](https://supabase.com/docs/guides/realtime/limits)) | 1 par joueur |
+| Messages Realtime / s | 100 ([doc](https://supabase.com/docs/guides/realtime/limits)) ; au-delà, déconnexions | **~32/s** en moyenne mesurés en simulation à 20 joueurs (envoi toutes les 5 s, adversaires toutes les 15 s), jusqu’à ~50/s quand les 20 joueurs sont actifs |
+| Messages Realtime / mois | ~2 M (sources tierces, à vérifier sur [supabase.com/pricing](https://supabase.com/pricing)) | ~60 000 à 90 000 par partie de 30 min à 20 joueurs → environ 20 à 30 parties/mois |
+| Base de données | ~500 Mo (à vérifier) | positions brutes effacées après 24 h ; ~1 Mo d'événements par partie |
+| Inscriptions anonymes | 30 / heure / IP (réglable) | 1 par nouveau téléphone |
+| Mise en pause | projet inactif ~7 jours | relancer depuis le tableau de bord |
 
-Le forfait gratuit **ne facture jamais** : en cas de dépassement, Supabase restreint le service. Aucune carte bancaire n'est nécessaire.
+Réduire la consommation : intervalle d'envoi 8–10 s, actualisation adversaires 30 s, mode « par impulsions ».
 
-### Estimation des messages Realtime
+## Cartographie
 
-Un message envoyé à un canal compte une fois par destinataire.
+| Service | Coût | Remarques |
+|---------|------|-----------|
+| OpenFreeMap (défaut) | gratuit, sans compte | fourni « tel quel », sans garantie ([CGU](https://openfreemap.org/tos/)) |
+| MapTiler (option) | offre gratuite limitée, clé requise | à vérifier sur maptiler.com/cloud/pricing |
+| Nominatim (recherche de lieu) | gratuit | 1 requête/s max, application identifiée ([politique](https://operations.osmfoundation.org/policies/nominatim/)) ; l'application ne cherche qu'à la validation |
+| tile.openstreetmap.org | — | **non utilisé** (politique OSMF) |
 
-Mesure issue de la simulation moteur (`tests/db/simulation.test.ts`, 20 joueurs, ~5 actions/s au total) :
-**≈ 55 messages délivrés par seconde** (13 150 livraisons en 240 s).
+## Expo / EAS
 
-| Scénario | Messages/s | Partie de 15 min | Parties possibles / mois (2 M) |
-|----------|-----------:|-----------------:|-------------------------------:|
-| 10 joueurs, jeu calme | ~10–15 | ~11 000 | ~180 |
-| 20 joueurs, jeu actif | ~55 | ~50 000 | ~40 |
-| 20 joueurs, très actif (réserve de pas 10, régénération 0,5 s) | 80–120 | ~100 000 | ~20 |
+| Élément | Coût |
+|---------|------|
+| Compte Expo, EAS Build Free | gratuit ; environ 15 builds Android + 15 iOS / mois, file basse priorité (à vérifier sur expo.dev/pricing) |
+| Builds locaux (`npx expo run:android`) | gratuits, nécessitent Android Studio/NDK (plusieurs Go) |
 
-Le dernier scénario peut approcher la limite de 100 messages/s : gardez une régénération des pas ≥ 1 s pour 20 joueurs.
+## Stores et signature
 
-Leviers pour réduire la consommation : régénération des pas plus lente, intervalle radar plus long, moins de joueurs par salon.
+| Élément | Coût | Nécessaire pour |
+|---------|------|-----------------|
+| Android : APK interne (EAS `preview`/`development`) | gratuit | installer sur vos téléphones et ceux de vos amis |
+| Google Play Console | 25 $ une fois | publication sur le Play Store (déclaration « localisation en arrière-plan » + vidéo exigées) |
+| **Apple Developer Program** | **99 $ / an** | installer sur iPhone via EAS (ad hoc / TestFlight) et publier sur l'App Store |
+| Alternative iOS sans abonnement | gratuit | un **Mac** + Xcode + identifiant Apple gratuit : installation locale valable 7 jours |
 
-### Mesurer la consommation
-
-- **Dans l'application** : Réglages > « Afficher le diagnostic » (compteurs de la session) ; pour l'administrateur, Réglages > « Administration : consommation des quotas » (taille de la base, livraisons Realtime estimées par jour et par mois).
-- **Côté Supabase** : tableau de bord > *Reports* / *Usage* (consommation réelle officielle).
-
-## Cloudflare Pages (forfait Free)
-
-| Ressource | Limite | Usage |
-|-----------|--------|-------|
-| Builds | 500 / mois, 1 à la fois, 20 min max | 1 build par `git push` sur la branche suivie |
-| Requêtes / bande passante statiques | illimitées | site 100 % statique |
-| Pages Functions | non utilisées | 0 |
-
-## GitHub
-
-Dépôt privé gratuit. Aucune GitHub Action n'est requise (le build est fait par Cloudflare).
+**Aucune dépense n'a été engagée.** Les options payantes sont signalées dans REMAINING_TASKS.md comme décisions à prendre par vous.

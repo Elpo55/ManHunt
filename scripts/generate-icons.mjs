@@ -1,4 +1,4 @@
-// Génère les icônes PNG de la PWA (sans dépendance) : emblème « réticule ».
+// Génère les icônes PNG de l application mobile (sans dépendance) : emblème « réticule ».
 // Usage : node scripts/generate-icons.mjs
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
@@ -51,9 +51,23 @@ function emblem(scale) {
     return [...col, 255];
   };
 }
-mkdirSync("public/icons", { recursive: true });
-writeFileSync("public/icons/icon-192.png", png(192, emblem(1)));
-writeFileSync("public/icons/icon-512.png", png(512, emblem(1)));
-writeFileSync("public/icons/icon-maskable-512.png", png(512, emblem(0.72)));
-writeFileSync("public/icons/apple-touch-icon.png", png(180, emblem(0.9)));
-console.log("Icônes générées dans public/icons/");
+// Variante transparente (premier plan adaptatif / monochrome / splash).
+function emblemAlpha(scale, mono = false) {
+  const base = emblem(scale);
+  return (x, y, size) => {
+    const [r, g, b] = base(x, y, size);
+    const a = Math.max(Math.abs(r - BG[0]), Math.abs(g - BG[1]), Math.abs(b - BG[2]));
+    if (a < 6) return [0, 0, 0, 0];
+    const alpha = Math.min(255, a * 2.2);
+    return mono ? [255, 255, 255, alpha] : [r, g, b, alpha];
+  };
+}
+const OUT = "apps/mobile/assets";
+mkdirSync(OUT, { recursive: true });
+writeFileSync(`${OUT}/icon.png`, png(1024, emblem(0.86)));
+writeFileSync(`${OUT}/android-icon-foreground.png`, png(1024, emblemAlpha(0.62)));
+writeFileSync(`${OUT}/android-icon-background.png`, png(1024, () => [...BG, 255]));
+writeFileSync(`${OUT}/android-icon-monochrome.png`, png(1024, emblemAlpha(0.62, true)));
+writeFileSync(`${OUT}/splash-icon.png`, png(512, emblemAlpha(0.9)));
+writeFileSync(`${OUT}/favicon.png`, png(48, emblem(1)));
+console.log(`Icônes générées dans ${OUT}/`);
