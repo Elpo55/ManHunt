@@ -5,7 +5,7 @@ import { ZONE, at, gamePhase, keepAlive, place, playerRow, report, setupGame, sk
 
 type Json = Record<string, any>;
 const M_LAT = 111_320;
-function distM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+function distM(a: Json, b: Json) {
   const dx = (b.lng - a.lng) * M_LAT * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180);
   return Math.hypot(dx, (b.lat - a.lat) * M_LAT);
 }

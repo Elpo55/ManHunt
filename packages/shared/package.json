@@ -1,0 +1,12 @@
+{
+  "name": "@traque/shared",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Logique de jeu partagée (pure TypeScript) : configuration, règles, géographie, état, contrôleur, carte.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16"
+  }
+}

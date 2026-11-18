@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { StreamSequencer } from "@/lib/realtime/sequencer";
-import { ServerClock, bestOffset, sampleFrom } from "@/lib/realtime/clock";
+import { StreamSequencer } from "@shared/sequencer";
+import { ServerClock, bestOffset, sampleFrom } from "@shared/clock";
 
 type Ev = { s: string; sn: number; id: string };
 const ev = (s: string, sn: number): Ev => ({ s, sn, id: `${s}#${sn}` });

@@ -1,40 +1,28 @@
 {
   "name": "projet-traque",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "description": "Jeu de traque géolocalisé multijoueur (Android / iOS) — monorepo.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "prebuild": "node scripts/write-manifest.mjs",
-    "build": "next build",
-    "start": "npx serve out",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:db": "vitest run tests/db",
     "test:load": "node scripts/load-test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p packages/shared/tsconfig.json && npm run typecheck -w apps/mobile",
+    "lint": "npm run lint -w apps/mobile",
+    "mobile": "npm run start -w apps/mobile",
     "icons": "node scripts/generate-icons.mjs"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.119.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.75.0",
-    "next": "16.4.6",
-    "radix-ui": "^1.8.1",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",
-    "@tailwindcss/turbopack": "4.3.3",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^24.19.2",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.6",
-    "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^5",
+    "typescript": "~5.9.3",
     "vitest": "^5.1.1"
   }
 }
