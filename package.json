@@ -4,9 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/write-manifest.mjs",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "npx serve out",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:db": "vitest run tests/db",
+    "test:load": "node scripts/load-test.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.1",
