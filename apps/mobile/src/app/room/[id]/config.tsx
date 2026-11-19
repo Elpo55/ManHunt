@@ -2,9 +2,12 @@ import { normalizeConfig, toAppError, type GameConfig } from "@traque/shared";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ConfigForm } from "../../../components/ConfigForm";
+import { OfflineDownload } from "../../../components/OfflineDownload";
+import { SavedConfigBar } from "../../../components/SavedConfigBar";
 import { Guard } from "../../../components/Guard";
 import { Button, Loading, Notice, Screen, useToast } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import { useAppSettings } from "../../../lib/appSettings";
 import { useAuth } from "../../../lib/auth";
 
 export default function RoomConfig() {
@@ -12,6 +15,7 @@ export default function RoomConfig() {
   const { session } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const settings = useAppSettings();
   const [config, setConfig] = useState<GameConfig | null>(null);
   const [editable, setEditable] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,7 +38,9 @@ export default function RoomConfig() {
         <Stack.Screen options={{ title: "Règles de la partie" }} />
         {error ? <Notice tone="error">{error}</Notice> : null}
         {!editable && config ? <Notice>Seul l’hôte peut modifier les règles, avant le lancement.</Notice> : null}
-        {config ? <ConfigForm value={config} onChange={setConfig} disabled={!editable} /> : <Loading />}
+        {config ? <SavedConfigBar config={config} onLoad={setConfig} disabled={!editable} /> : null}
+        {config ? <ConfigForm value={config} onChange={setConfig} disabled={!editable} features={settings.features} /> : <Loading />}
+        {config ? <OfflineDownload zone={config.zone} name={config.zone.label} /> : null}
         {editable && config ? (
           <>
             <Notice icon="info">Enregistrer les règles demande à chaque joueur de renouveler son accord (le contexte change).</Notice>

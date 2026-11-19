@@ -13,6 +13,7 @@ import {
   type MarkerKind,
   type Team,
 } from "@traque/shared";
+import { APP_VERSION } from "./env";
 import { getSupabase } from "./supabase";
 
 export async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -24,7 +25,17 @@ export async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Pr
   } catch (e) {
     throw toAppError(e);
   }
-  if (res.error) throw toAppError(res.error);
+  if (res.error) {
+    const err = toAppError(res.error);
+    // Erreur inattendue : remontée (anonymisée, limitée) au tableau de bord d'administration.
+    if (err.code === "E_INTERNAL" && fn !== "log_client_error") {
+      void sb.rpc("log_client_error", { p_code: err.code, p_context: `${fn}: ${err.message}`.slice(0, 300), p_app_version: APP_VERSION }).then(
+        () => undefined,
+        () => undefined,
+      );
+    }
+    throw err;
+  }
   const data = res.data as { error?: unknown } | null;
   if (data && typeof data === "object" && typeof data.error === "string") throw new AppError(data.error);
   return res.data as T;

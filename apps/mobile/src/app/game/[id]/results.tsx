@@ -16,6 +16,7 @@ const REASON: Record<string, string> = {
   fugitives_left: "Tous les Fugitifs ont quitté la partie.",
   aborted: "Partie interrompue par l'hôte (non comptée).",
   no_players: "Plus aucun joueur actif.",
+  objectives: "Les Fugitifs ont atteint tous les objectifs.",
 };
 
 export default function Results() {
@@ -35,7 +36,7 @@ export default function Results() {
           .from("game_events")
           .select("stream,sn,type,payload,created_at")
           .eq("game_id", id)
-          .in("type", ["capture", "player_status", "phase_changed", "game_finished", "zone_status"])
+          .in("type", ["capture", "player_status", "phase_changed", "game_finished", "zone_status", "objective_claimed", "extracted", "zone_shrink", "sos", "admin_action"])
           .order("id", { ascending: true })
           .limit(500);
         setEvents((data ?? []).map((r) => ({ s: r.stream, sn: r.sn, t: r.type, d: r.payload, at: new Date(r.created_at).getTime() })));
@@ -73,6 +74,7 @@ export default function Results() {
               <Stat label="Votre score" value={mine.score} />
               <Stat label={mine.initial_team === "hunter" ? "Captures" : "Survie"} value={mine.initial_team === "hunter" ? mine.captures : formatDuration(mine.survival_seconds)} />
               <Stat label="Distance" value={`${((mine.distance ?? 0) / 1000).toFixed(1)} km`} />
+              {mine.objectives ? <Stat label="Balises" value={mine.objectives} /> : null}
             </View>
           </Panel>
         ) : null}
@@ -98,6 +100,10 @@ export default function Results() {
           </Panel>
         ) : null}
         <T v="caption">Les positions GPS détaillées ne sont pas conservées : elles sont effacées 24 h après la partie.</T>
+        {s.game.config.replay?.enabled && s.game.ended_at && s.view.server_now - s.game.ended_at < 24 * 3600_000 ? (
+          <Button label="Revoir la partie (replay 24 h)" icon="film" variant="secondary" onPress={() => router.push(`/game/${s.game.id}/replay`)} />
+        ) : null}
+        <Button label="Mes succès et statistiques" icon="award" variant="ghost" onPress={() => router.push("/profile")} />
         <Button label="Retour au salon" onPress={() => router.replace(`/room/${s.view.room.id}`)} />
       </Screen>
     </Guard>

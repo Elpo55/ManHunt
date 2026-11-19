@@ -4,11 +4,13 @@
  */
 import { Feather } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { Platform, View } from "react-native";
 import { Guard } from "../components/Guard";
 import { Button, Notice, Panel, Screen, T } from "../components/ui";
 import { useLocationPermissions } from "../lib/location/permissions";
 import { safeNext } from "@traque/shared";
+import { notificationPermission, requestNotificationPermission } from "../lib/notify";
 import { colors, space } from "../theme";
 
 function Row({ ok, title, text }: { ok: boolean | null; title: string; text: string }) {
@@ -32,6 +34,10 @@ export default function Permissions() {
   const fg = state.foreground === "granted";
   const bg = state.background === "granted";
   const bgLabel = Platform.OS === "ios" ? "« Toujours »" : "« Toujours autoriser »";
+  const [notif, setNotif] = useState<"granted" | "denied" | "undetermined" | null>(null);
+  useEffect(() => {
+    notificationPermission().then(setNotif).catch(() => setNotif(null));
+  }, [state]);
 
   return (
     <Guard>
@@ -65,6 +71,18 @@ export default function Permissions() {
           )
         ) : null}
         {!state.precise && fg ? <Button label="Activer la position exacte" variant="secondary" onPress={openSettings} /> : null}
+        <Panel>
+          <Row
+            ok={notif === null ? null : notif === "granted"}
+            title="Notifications (recommandé)"
+            text="Alertes locales écran éteint pendant une partie : Chasseur proche, capture, radar, SOS. Rien n'est envoyé hors partie."
+          />
+          {notif === "undetermined" ? (
+            <Button label="Autoriser les notifications" small variant="secondary" icon="bell" onPress={async () => setNotif((await requestNotificationPermission()) ? "granted" : await notificationPermission())} />
+          ) : notif === "denied" ? (
+            <Button label="Ouvrir les réglages" small variant="ghost" icon="settings" onPress={openSettings} />
+          ) : null}
+        </Panel>
         <Notice icon="shield">
           Vous pouvez retirer ces autorisations à tout moment dans les réglages du téléphone. Aucune position n’est envoyée hors d’une partie.
         </Notice>

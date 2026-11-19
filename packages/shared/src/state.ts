@@ -79,6 +79,8 @@ export interface FinalEntry {
   captures: number;
   survival_seconds: number;
   distance?: number;
+  objectives?: number;
+  extracted?: boolean;
 }
 
 /** Cercle de zone (Royale : zone courante / prochaine). */

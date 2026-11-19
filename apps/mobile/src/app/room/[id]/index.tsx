@@ -3,7 +3,7 @@
  * sécurité et consentement explicite au partage de position, lancement.
  */
 import { Feather } from "@expo/vector-icons";
-import { SAFETY_RULES, formatDuration, formatMeters, toAppError, type Team } from "@traque/shared";
+import { MODE_LABEL, SAFETY_RULES, formatDuration, formatMeters, toAppError, type Team } from "@traque/shared";
 import * as Clipboard from "expo-clipboard";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -25,6 +25,10 @@ function blockers(s: RoomState): string[] {
   if (noTeam) out.push(`${noTeam} joueur(s) sans équipe.`);
   if (m.length >= 2 && !m.some((x) => x.team === "hunter")) out.push("Aucun Chasseur.");
   if (m.length >= 2 && !m.some((x) => x.team === "fugitive")) out.push("Aucun Fugitif.");
+  const cfg = s.room.config;
+  if (cfg.mode === "misterx" && m.filter((x) => x.team === "fugitive").length !== 1) out.push("Mister X : un seul Fugitif, tous les autres Chasseurs.");
+  if (cfg.mode === "royale" && cfg.zone.shape === "polygon") out.push("Royale : la zone doit être circulaire.");
+  if (cfg.objectives?.enabled && !cfg.objectives.beacons.length && !cfg.objectives.extraction.set) out.push("Objectifs activés mais aucune balise placée.");
   const noConsent = m.filter((x) => !x.location_consent).length;
   if (noConsent) out.push(`${noConsent} joueur(s) n'ont pas encore accepté les consignes.`);
   return out;
@@ -83,7 +87,11 @@ export default function Lobby() {
   };
 
   const memberMenu = (m: RoomMember) => {
-    if (!isHost || m.user_id === userId) return;
+    if (!isHost && m.user_id !== userId) {
+      sheetMenu.show({ title: m.username, actions: [{ label: "Signaler ce joueur", icon: "flag", onPress: () => router.push(`/report?room=${s.room.id}&target=${m.user_id}`) }] });
+      return;
+    }
+    if (m.user_id === userId) return;
     const setTeam = (t: Team | null) => run("team", () => api.setMemberTeam(s.room.id, m.user_id, t));
     const actions: SheetAction[] = [
       ...(lobby
@@ -93,6 +101,7 @@ export default function Lobby() {
             { label: "Sans équipe", icon: "help-circle" as const, onPress: () => setTeam(null) },
           ]
         : []),
+      { label: "Signaler ce joueur", icon: "flag", onPress: () => router.push(`/report?room=${s.room.id}&target=${m.user_id}`) },
       { label: "Transmettre le rôle d'hôte", icon: "star", onPress: () => run("host", () => api.transferHost(s.room.id, m.user_id), `${m.username} est l'hôte.`) },
       {
         label: "Exclure du salon",
@@ -150,6 +159,10 @@ export default function Lobby() {
           <T v="small">
             {cfg.zone.set ? `${cfg.zone.label} · rayon ${formatMeters(cfg.zone.radius_m)}` : "Zone non choisie"}
             {"\n"}
+            {MODE_LABEL[cfg.mode]} · {cfg.capture_method === "qr" ? "capture QR" : cfg.capture_method === "both" ? "capture GPS ou QR" : "capture GPS"}
+            {cfg.objectives?.enabled ? ` · ${cfg.objectives.beacons.length} balise(s)${cfg.objectives.extraction.set ? " + extraction" : ""}` : ""}
+            {cfg.rendezvous?.set ? ` · RDV : ${cfg.rendezvous.label}` : ""}
+            {"\n"}
             {formatDuration(cfg.duration_s)} · capture à {cfg.capture_radius_m} m · adversaires {cfg.enemy_reveal === "live" ? `toutes les ${cfg.enemy_refresh_s} s` : "par impulsions"} (≈ {cfg.approx_m} m)
           </T>
           {!isHost ? <Button label="Voir la zone et les règles" small variant="ghost" onPress={() => router.push(`/room/${s.room.id}/config`)} /> : null}
@@ -185,6 +198,12 @@ export default function Lobby() {
                 </View>
               ))}
             </View>
+            {cfg.replay?.enabled ? (
+              <T v="small">Replay activé : vos trajets (arrondis à 10 m) seront visibles par les participants pendant 24 h après la partie, puis effacés.</T>
+            ) : null}
+            {cfg.spectators?.enabled ? (
+              <T v="small">Spectateurs : un joueur capturé voit les positions de tous avec {Math.round((cfg.spectators.delay_s ?? 180) / 60)} min de décalage.</T>
+            ) : null}
             <Toggle
               label="J'accepte ces consignes et le partage de ma position pendant cette partie"
               description="Obligatoire pour jouer. Vous pourrez arrêter le partage à tout moment."
@@ -211,9 +230,9 @@ export default function Lobby() {
             <Pressable
               key={m.user_id}
               onPress={() => memberMenu(m)}
-              disabled={!isHost || m.user_id === userId}
+              disabled={m.user_id === userId}
               style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md }, pressed && { backgroundColor: colors.slate }]}
-              accessibilityRole={isHost ? "button" : undefined}
+              accessibilityRole="button"
               accessibilityLabel={`${m.username}${m.is_host ? ", hôte" : ""}`}
             >
               <View>
@@ -256,6 +275,7 @@ export default function Lobby() {
           <T v="small" style={{ textAlign: "center" }}>En attente du lancement par l’hôte.</T>
         ) : null}
 
+        <Button label="Signaler un problème" variant="ghost" icon="flag" small onPress={() => router.push(`/report?room=${s.room.id}`)} />
         <Button
           label="Quitter le salon"
           variant="ghost"

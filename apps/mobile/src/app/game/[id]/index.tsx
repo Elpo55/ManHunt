@@ -39,6 +39,7 @@ import { GameMap, type GameMapHandle } from "../../../components/map/GameMap";
 import { Avatar, Button, IconButton, Loading, Notice, Segmented, T, useActionSheet, useBackHandler, useToast, type IconName } from "../../../components/ui";
 import { api, ROLE_RANK } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+import { useAppSettings } from "../../../lib/appSettings";
 import { APP_NAME } from "../../../lib/env";
 import { clearGameNotifications, notifyLocal } from "../../../lib/notify";
 import { useGame } from "../../../lib/game/useGame";
@@ -54,7 +55,6 @@ const CATEGORY: Record<string, NotifyCategory> = {
   team_msg: "team", objective_claimed: "team", extracted: "team", extraction_open: "team", achievement: "team",
   sos: "safety", sos_resolved: "safety", gps_silent: "safety", admin_action: "safety", zone_status: "safety", alert: "proximity",
 };
-const PROXIMITY_M = 75;
 const clockTime = (ms: number) => new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
 function KeepAwake() {
@@ -257,6 +257,8 @@ export default function GameScreen() {
   const [sosOpen, setSosOpen] = useState(false);
   const [spectatorFc, setSpectatorFc] = useState<FC | undefined>(undefined);
   const lastProximity = useRef(0);
+  // Distance d'alerte de proximité (réglable par l'administration).
+  const proximityM = useAppSettings().notifications?.proximity_m ?? 75;
   const royaleWarned = useRef<number | null>(null);
 
   const onEvent = useCallback(
@@ -342,14 +344,14 @@ export default function GameScreen() {
   const myTeam = s?.me.team;
   const myActive = s?.me.status === "active" && s?.game.phase === "running";
   useEffect(() => {
-    if (!myActive || nearestEnemy === null || nearestEnemy > PROXIMITY_M) return;
+    if (!myActive || nearestEnemy === null || nearestEnemy > proximityM) return;
     if (Date.now() - lastProximity.current < 60_000) return;
     lastProximity.current = Date.now();
     const text = myTeam === "fugitive" ? `Un Chasseur est proche (~${formatMeters(nearestEnemy)}).` : `Fugitif détecté à ~${formatMeters(nearestEnemy)}.`;
     toast.push(text, myTeam === "fugitive" ? "error" : "hunter");
     haptic("warning");
     void notifyLocal("proximity", APP_NAME, text, { key: "proximity", minIntervalMs: 60_000 });
-  }, [nearestEnemy, myActive, myTeam, toast]);
+  }, [nearestEnemy, myActive, myTeam, toast, proximityM]);
 
   const hostMenu = useCallback(() => {
     if (!s || !c) return;

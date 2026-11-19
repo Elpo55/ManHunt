@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
 import { Guard } from "../components/Guard";
 import { ProfileForm } from "../components/ProfileForm";
+import { ProgressPanels } from "../components/ProgressPanels";
 import { Button, Field, Input, Notice, Panel, Screen, SectionTitle, Stat, T, TeamTag } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { getSupabase } from "../lib/supabase";
@@ -54,6 +55,7 @@ export default function Profile() {
                 <Stat label="Survie cumulée" value={formatDuration(p.survival_seconds)} />
               </View>
             </Panel>
+            <ProgressPanels />
             <Panel>
               <SectionTitle>Historique</SectionTitle>
               {history === null ? null : history.length === 0 ? (

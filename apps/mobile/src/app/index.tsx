@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ProfileError } from "../components/Guard";
+import { HomeBanners } from "../components/HomeBanners";
 import { Avatar, Button, IconButton, Loading, Notice, Panel, Screen, T } from "../components/ui";
 import { api, type MyRoom } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -70,6 +71,7 @@ function Dashboard() {
           </View>
         </View>
 
+        <HomeBanners />
         <Pressable onPress={() => router.push("/rooms/new")} style={({ pressed }) => [{ backgroundColor: colors.volt, borderRadius: radius.panel, padding: space.xl, gap: space.xl, opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button" accessibilityLabel="Créer un salon">
           <Feather name="plus" size={24} color="#fff" />
           <View>
