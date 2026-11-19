@@ -37,10 +37,10 @@ Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] 
 - **Actions** : https://expo.dev/signup ; puis `cd apps/mobile && npx eas-cli@latest login`.
 - **Vérification** : `npx eas-cli whoami` affiche votre identifiant.
 
-### 1.3 [ ] GitHub (recommandé)
-- **Objectif** : sauvegarder le code hors de ce PC.
-- **Actions** : `gh auth login` puis, à la racine : `gh repo create projet-traque --private --source . --remote origin --push`.
-- **Vérification** : dépôt **privé** visible ; aucun fichier `.env` dedans (`git ls-files | grep .env` ne doit lister que `apps/mobile/.env.example`).
+### 1.3 [x] GitHub (fait)
+- Dépôt **privé** https://github.com/Elpo55/ManHunt : branches `main` et `archive/web-real-world-map`, étiquette `v0.1.0-web`.
+- Vérifié : aucun `.env`, keystore ni APK dans le dépôt ni dans l'historique (les APK restent dans `releases/` sur ce PC).
+- Récupérer le projet ailleurs : `gh repo clone Elpo55/ManHunt` puis `npm install` et recréer `apps/mobile/.env` (valeurs dans `apps/mobile/.env.example` + tableau de bord Supabase).
 
 ### 1.4 [!] Apple Developer Program — **décision à prendre (99 $/an)**
 - **Objectif** : installer l'application sur des iPhone (hors App Store) et publier sur l'App Store.
