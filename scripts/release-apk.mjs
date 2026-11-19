@@ -93,7 +93,7 @@ if (pending) fail(`Modifications non commitées dans le code de l'application :
 ${pending}
 Commitez-les d'abord : l'APK doit correspondre à un commit.`);
 const commitSha = gitIn(ROOT, ["rev-parse", "HEAD"]);
-const root = process.env.TRAQUE_BUILD_DIR || (isWin ? "C:\tqb" : join(ROOT, ".build-worktree"));
+const root = process.env.TRAQUE_BUILD_DIR || (isWin ? "C:/tqb" : join(ROOT, ".build-worktree"));
 log(`Copie de build : ${root} (commit ${commitSha.slice(0, 7)})`);
 if (!existsSync(join(root, ".git"))) {
   if (existsSync(root) && readdirSync(root).length) fail(`${root} existe et n'est pas un worktree du dépôt.`);
