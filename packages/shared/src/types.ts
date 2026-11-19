@@ -5,8 +5,9 @@ export type GamePhase = "preparation" | "running" | "paused" | "finished";
 export type RoomStatus = "lobby" | "playing" | "results" | "closed";
 export type PlayerStatus = "active" | "captured" | "abandoned";
 export type Winner = Team | "draw";
-export type EndReason = "all_captured" | "time_up" | "hunters_left" | "fugitives_left" | "aborted" | "no_players";
-export type GameMode = "classic" | "infection";
+export type EndReason = "all_captured" | "time_up" | "hunters_left" | "fugitives_left" | "aborted" | "no_players" | "objectives";
+export type GameMode = "classic" | "infection" | "royale" | "misterx";
+export type CaptureMethod = "gps" | "qr" | "both";
 export type RadarPrecision = "direction" | "sector" | "zone";
 export type AbilityKey = "ghost" | "jammer" | "decoy" | "scan" | "tracker" | "sonar";
 export type Dir8 = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
@@ -18,11 +19,45 @@ export interface LatLng {
   lng: number;
 }
 
-/** Zone de jeu réelle : cercle choisi par l'hôte. `set` = validée par l'hôte. */
+export type ForbiddenZone =
+  | { kind: "circle"; lat: number; lng: number; radius_m: number; label: string }
+  | { kind: "polygon"; points: LatLng[]; label: string };
+
+/**
+ * Zone de jeu réelle choisie par l'hôte. `set` = validée par l'hôte.
+ * Forme : cercle (centre + rayon) ou polygone (le cercle sert alors de cadrage).
+ * À l'intérieur d'une zone interdite, le joueur est « hors zone ».
+ */
 export interface GameZone extends LatLng {
   radius_m: number;
   label: string;
   set: boolean;
+  shape: "circle" | "polygon";
+  polygon: LatLng[];
+  forbidden: ForbiddenZone[];
+}
+
+/** Lieu choisi par l'hôte (point de rendez-vous, extraction). */
+export interface GamePlace extends LatLng {
+  set: boolean;
+  label: string;
+}
+
+export interface RoyaleConfig {
+  stages: number;
+  final_ratio: number;
+  warn_s: number;
+}
+
+export interface ObjectivesConfig {
+  enabled: boolean;
+  radius_m: number;
+  points_each: number;
+  win_on_all: boolean;
+  beacons: (LatLng & { label: string })[];
+  extraction: GamePlace;
+  extraction_open_s: number;
+  extraction_bonus: number;
 }
 
 export interface AbilityConfig {
@@ -56,11 +91,19 @@ export interface GameConfig {
   stale_after_s: number;
   capture_radius_m: number;
   capture_cooldown_s: number;
+  capture_method: CaptureMethod;
   max_accuracy_m: number;
   max_speed_mps: number;
   out_of_zone_grace_s: number;
   disconnect_grace_s: number;
+  gps_silent_s: number;
   radar: RadarConfig;
+  royale: RoyaleConfig;
+  misterx: { reveal_interval_s: number };
+  objectives: ObjectivesConfig;
+  spectators: { enabled: boolean; delay_s: number };
+  replay: { enabled: boolean };
+  rendezvous: GamePlace;
   abilities: Record<AbilityKey, AbilityConfig>;
 }
 
