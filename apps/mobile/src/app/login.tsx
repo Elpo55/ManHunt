@@ -1,11 +1,13 @@
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Button, Field, Input, Notice, Panel, Screen, Segmented, T } from "../components/ui";
 import { useAuth } from "../lib/auth";
+import { safeNext, withNext } from "@traque/shared";
 
 export default function Login() {
-  const { session, profile, signInGuest, signInEmail, signUpEmail } = useAuth();
+  const { session, profile, profileError, signInGuest, signInEmail, signUpEmail } = useAuth();
   const router = useRouter();
+  const next = safeNext(useLocalSearchParams<{ next?: string }>().next);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,8 +16,8 @@ export default function Login() {
   const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
-    if (session && profile) router.replace(profile.username ? "/" : "/onboarding");
-  }, [session, profile, router]);
+    if (session && profile) router.replace(profile.username ? (next ?? "/") : withNext("/onboarding", next));
+  }, [session, profile, router, next]);
 
   const run = async (kind: "guest" | "email", fn: () => Promise<unknown>) => {
     setBusy(kind);
@@ -70,6 +72,7 @@ export default function Login() {
         />
       </Panel>
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {session && !profile && profileError ? <Notice tone="error">{profileError.message}</Notice> : null}
       {info ? <Notice>{info}</Notice> : null}
     </Screen>
   );

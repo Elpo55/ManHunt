@@ -7,7 +7,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ToastProvider } from "../components/ui";
+import { ActionSheetProvider, ToastProvider } from "../components/ui";
 import { gameApi } from "../lib/api";
 import { AuthProvider } from "../lib/auth";
 // Ce module déclare la tâche GPS (TaskManager.defineTask) dès son import.
@@ -36,6 +36,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <ToastProvider>
+          <ActionSheetProvider>
           <StatusBar style="light" />
           <Stack
             screenOptions={{
@@ -50,6 +51,7 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="game/[id]/index" options={{ headerShown: false, gestureEnabled: false }} />
           </Stack>
+          </ActionSheetProvider>
         </ToastProvider>
       </AuthProvider>
     </SafeAreaProvider>

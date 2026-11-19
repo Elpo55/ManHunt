@@ -131,3 +131,26 @@ describe("cartographie interchangeable", () => {
     expect(await search("ab")).toEqual([]);
   });
 });
+
+import { safeNext, withNext } from "../../packages/shared/src/next";
+
+describe("destination après connexion (next)", () => {
+  it("accepte uniquement les chemins internes", () => {
+    expect(safeNext("/join?code=K7M2QX")).toBe("/join?code=K7M2QX");
+    expect(safeNext(["/room/abc"])).toBe("/room/abc");
+    expect(safeNext("https://exemple.test")).toBeNull();
+    expect(safeNext("//exemple.test/x")).toBeNull();
+    expect(safeNext("/x?u=https://exemple.test")).toBeNull();
+    expect(safeNext("join")).toBeNull();
+    expect(safeNext(undefined)).toBeNull();
+  });
+  it("n'enchaîne jamais vers la connexion ou le profil (boucles)", () => {
+    expect(safeNext("/login")).toBeNull();
+    expect(safeNext("/onboarding?next=/join")).toBeNull();
+    expect(safeNext("/loginx")).toBe("/loginx");
+  });
+  it("encode la destination", () => {
+    expect(withNext("/login", "/join?code=AB")).toBe("/login?next=%2Fjoin%3Fcode%3DAB");
+    expect(withNext("/login", null)).toBe("/login");
+  });
+});

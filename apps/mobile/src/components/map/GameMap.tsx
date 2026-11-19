@@ -18,8 +18,9 @@ import {
   EMPTY_FC,
   type GameState,
 } from "@traque/shared";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, StyleSheet, View } from "react-native";
+import { T } from "../ui";
 import { mapProvider } from "../../lib/env";
 import { colors } from "../../theme";
 
@@ -30,10 +31,20 @@ export interface GameMapHandle {
 
 const mapStyle = (mapProvider.styleUrl ?? buildDarkStyle(mapProvider)) as string | StyleSpecification;
 
-export const GameMap = forwardRef<GameMapHandle, { state: GameState; now: number }>(function GameMap({ state, now }, ref) {
+/**
+ * `now` doit être arrondi par l'appelant (1 s) : la carte n'est alors
+ * redessinée qu'à 1 Hz au plus, ou quand l'état change (memo).
+ */
+export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: number }>(function GameMap({ state, now }, ref) {
   const camera = useRef<CameraRef>(null);
   const zone = state.game.zone;
-  const bounds = zoneBounds(zone, zone.radius_m, 0.08);
+  const [failed, setFailed] = useState(false);
+  const bounds = useMemo(() => zoneBounds(zone, zone.radius_m, 0.08), [zone]);
+  const initialView = useMemo(() => ({ bounds: [bounds.sw[0], bounds.sw[1], bounds.ne[0], bounds.ne[1]] as [number, number, number, number] }), [bounds]);
+  const maxBounds = useMemo(() => {
+    const b = zoneBounds(zone, zone.radius_m, 2);
+    return [b.sw[0], b.sw[1], b.ne[0], b.ne[1]] as [number, number, number, number];
+  }, [zone]);
   const zl = useMemo(() => zoneLayers(zone), [zone]);
   const players = useMemo(() => playerLayers(state, now), [state, now]);
   const radar = useMemo(() => radarLayers(state, now), [state, now]);
@@ -79,7 +90,9 @@ export const GameMap = forwardRef<GameMapHandle, { state: GameState; now: number
         style={StyleSheet.absoluteFill}
         mapStyle={mapStyle}
         attribution
-        attributionPosition={{ bottom: 8, left: 8 }}
+        attributionPosition={ATTRIBUTION_POSITION}
+        onDidFailLoadingMap={() => setFailed(true)}
+        onDidFinishLoadingMap={() => setFailed(false)}
         logo={false}
         compass={false}
         touchRotate={false}
@@ -88,11 +101,8 @@ export const GameMap = forwardRef<GameMapHandle, { state: GameState; now: number
       >
         <Camera
           ref={camera}
-          initialViewState={{ bounds: [bounds.sw[0], bounds.sw[1], bounds.ne[0], bounds.ne[1]] }}
-          maxBounds={(() => {
-            const b = zoneBounds(zone, zone.radius_m, 2);
-            return [b.sw[0], b.sw[1], b.ne[0], b.ne[1]];
-          })()}
+          initialViewState={initialView}
+          maxBounds={maxBounds}
           minZoom={11}
           maxZoom={19}
         />
@@ -173,6 +183,16 @@ export const GameMap = forwardRef<GameMapHandle, { state: GameState; now: number
           />
         </GeoJSONSource>
       </Map>
+      {failed ? (
+        <View style={styles.failed} pointerEvents="none">
+          <T v="small" color={colors.ivory}>Fond de carte indisponible (réseau ou serveur de tuiles). Les joueurs, la zone et le radar restent affichés.</T>
+        </View>
+      ) : null}
     </View>
   );
+}));
+
+const ATTRIBUTION_POSITION = { bottom: 8, left: 8 };
+const styles = StyleSheet.create({
+  failed: { position: "absolute", left: 16, right: 16, top: "38%", backgroundColor: "rgba(16,19,25,0.94)", borderRadius: 12, padding: 12 },
 });

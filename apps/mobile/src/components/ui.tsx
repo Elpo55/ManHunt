@@ -4,9 +4,11 @@
  */
 import { Feather } from "@expo/vector-icons";
 import { parseAvatar } from "@traque/shared";
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -355,6 +357,89 @@ export function useToast() {
   return c;
 }
 
+// ---------------------------------------------------------------------------
+// Feuille d'actions (menu modal)
+// Remplace Alert.alert pour les menus : sur Android, Alert n'affiche que
+// 3 boutons et ignore silencieusement les suivants.
+// ---------------------------------------------------------------------------
+export interface SheetAction {
+  label: string;
+  onPress: () => void;
+  icon?: IconName;
+  tone?: "default" | "destructive";
+}
+interface SheetRequest {
+  title: string;
+  message?: string;
+  actions: SheetAction[];
+  cancelLabel?: string;
+}
+const ActionSheetCtx = createContext<{ show: (r: SheetRequest) => void } | null>(null);
+
+export function ActionSheetProvider({ children }: { children: ReactNode }) {
+  const [req, setReq] = useState<SheetRequest | null>(null);
+  const insets = useSafeAreaInsets();
+  const show = useCallback((r: SheetRequest) => setReq(r), []);
+  const close = useCallback(() => setReq(null), []);
+  const value = useMemo(() => ({ show }), [show]);
+  return (
+    <ActionSheetCtx.Provider value={value}>
+      {children}
+      <Modal visible={!!req} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+        <Pressable style={s.sheetBackdrop} onPress={close} accessibilityRole="button" accessibilityLabel="Fermer le menu">
+          <Pressable style={[s.sheetBox, { paddingBottom: Math.max(insets.bottom, space.md) + space.sm }]} onPress={() => undefined} accessible={false}>
+            {req ? (
+              <>
+                <View style={{ gap: 2, paddingHorizontal: space.sm, paddingBottom: space.sm }}>
+                  <T v="heading" numberOfLines={2}>{req.title}</T>
+                  {req.message ? <T v="small">{req.message}</T> : null}
+                </View>
+                {req.actions.map((a) => (
+                  <Pressable
+                    key={a.label}
+                    accessibilityRole="button"
+                    accessibilityLabel={a.label}
+                    onPress={() => {
+                      setReq(null);
+                      // Laisse la fermeture se terminer avant une éventuelle nouvelle feuille/alerte.
+                      setTimeout(a.onPress, 50);
+                    }}
+                    style={({ pressed }) => [s.sheetItem, pressed && { backgroundColor: colors.slate2 }]}
+                  >
+                    {a.icon ? <Feather name={a.icon} size={18} color={a.tone === "destructive" ? colors.danger : colors.fog} /> : null}
+                    <T color={a.tone === "destructive" ? colors.danger : colors.ivory} style={{ flex: 1 }}>{a.label}</T>
+                  </Pressable>
+                ))}
+                <Pressable accessibilityRole="button" onPress={close} style={({ pressed }) => [s.sheetItem, { justifyContent: "center", marginTop: space.xs }, pressed && { backgroundColor: colors.slate2 }]}>
+                  <T color={colors.fog}>{req.cancelLabel ?? "Fermer"}</T>
+                </Pressable>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </ActionSheetCtx.Provider>
+  );
+}
+
+export function useActionSheet() {
+  const c = useContext(ActionSheetCtx);
+  if (!c) throw new Error("useActionSheet hors ActionSheetProvider");
+  return c;
+}
+
+/** Intercepte le bouton/geste « retour » Android tant que `handler` renvoie true. */
+export function useBackHandler(handler: () => boolean) {
+  const ref = useRef(handler);
+  useEffect(() => {
+    ref.current = handler;
+  });
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => ref.current());
+    return () => sub.remove();
+  }, []);
+}
+
 export const s = StyleSheet.create({
   panel: { backgroundColor: colors.graphite, borderRadius: radius.panel, padding: space.lg, gap: space.md },
   row: { flexDirection: "row", alignItems: "center" },
@@ -369,5 +454,8 @@ export const s = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   notice: { flexDirection: "row", gap: space.sm, backgroundColor: colors.graphite, borderRadius: radius.control, padding: space.md, borderLeftWidth: 3 },
   toastWrap: { position: "absolute", left: space.lg, right: space.lg, gap: space.sm, zIndex: 100 },
+  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  sheetBox: { backgroundColor: colors.graphite, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: space.md, gap: 2 },
+  sheetItem: { minHeight: 50, borderRadius: radius.control, flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.md },
   toast: { backgroundColor: colors.slate2, borderRadius: 12, paddingHorizontal: space.lg, paddingVertical: space.md, borderLeftWidth: 3, borderLeftColor: colors.volt },
 });

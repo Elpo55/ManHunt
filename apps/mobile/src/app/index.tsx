@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ProfileError } from "../components/Guard";
 import { Avatar, Button, IconButton, Loading, Notice, Panel, Screen, T } from "../components/ui";
 import { api, type MyRoom } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -116,10 +117,11 @@ function Dashboard() {
 }
 
 export default function Home() {
-  const { configured, ready, session, profile } = useAuth();
+  const { configured, ready, session, profile, profileError } = useAuth();
   if (configured && !ready) return <Loading label="Connexion au serveur" />;
   if (!configured || !session) return <Welcome />;
-  if (!profile?.username) return profile ? <OnboardingRedirect /> : <Loading />;
+  if (!profile) return profileError ? <ProfileError /> : <Loading label="Chargement du profil" />;
+  if (!profile.username) return <OnboardingRedirect />;
   return <Dashboard />;
 }
 

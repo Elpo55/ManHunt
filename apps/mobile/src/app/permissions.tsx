@@ -3,11 +3,12 @@
  * (relu à chaque retour au premier plan : changement dans les réglages).
  */
 import { Feather } from "@expo/vector-icons";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Platform, View } from "react-native";
 import { Guard } from "../components/Guard";
 import { Button, Notice, Panel, Screen, T } from "../components/ui";
 import { useLocationPermissions } from "../lib/location/permissions";
+import { safeNext } from "@traque/shared";
 import { colors, space } from "../theme";
 
 function Row({ ok, title, text }: { ok: boolean | null; title: string; text: string }) {
@@ -26,6 +27,7 @@ function Row({ ok, title, text }: { ok: boolean | null; title: string; text: str
 
 export default function Permissions() {
   const router = useRouter();
+  const next = safeNext(useLocalSearchParams<{ next?: string }>().next);
   const { state, requestForeground, requestBackground, openSettings } = useLocationPermissions();
   const fg = state.foreground === "granted";
   const bg = state.background === "granted";
@@ -66,7 +68,7 @@ export default function Permissions() {
         <Notice icon="shield">
           Vous pouvez retirer ces autorisations à tout moment dans les réglages du téléphone. Aucune position n’est envoyée hors d’une partie.
         </Notice>
-        <Button label={fg ? "Continuer" : "Plus tard"} variant={fg ? "primary" : "ghost"} onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />
+        <Button label={fg ? "Continuer" : "Plus tard"} variant={fg ? "primary" : "ghost"} onPress={() => (next ? router.replace(next) : router.canGoBack() ? router.back() : router.replace("/"))} />
       </Screen>
     </Guard>
   );

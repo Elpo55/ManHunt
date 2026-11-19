@@ -53,6 +53,9 @@ export function useLocationPermissions() {
     }
   }, []);
   useEffect(() => {
+    // Lecture asynchrone d'un système externe (permissions OS) : l'état est
+    // mis à jour après la réponse, pas de rendu en cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const sub = AppState.addEventListener("change", (s) => s === "active" && void refresh());
     return () => sub.remove();

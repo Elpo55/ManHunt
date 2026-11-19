@@ -28,7 +28,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GameMap, type GameMapHandle } from "../../../components/map/GameMap";
-import { Avatar, Button, IconButton, Loading, Notice, Segmented, T, useToast, type IconName } from "../../../components/ui";
+import { Avatar, Button, IconButton, Loading, Notice, Segmented, T, useActionSheet, useBackHandler, useToast, type IconName } from "../../../components/ui";
 import { useAuth } from "../../../lib/auth";
 import { useGame } from "../../../lib/game/useGame";
 import { useLocationPermissions } from "../../../lib/location/permissions";
@@ -145,6 +145,7 @@ export default function GameScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const sheetMenu = useActionSheet();
   const perms = useLocationPermissions();
   const [settings] = useSettings();
   const mapRef = useRef<GameMapHandle>(null);
@@ -179,6 +180,50 @@ export default function GameScreen() {
     return best;
   }, [s, g.now]);
 
+  const hostMenu = useCallback(() => {
+    if (!s || !c) return;
+    const finished = s.game.phase === "finished";
+    const active = s.me.status === "active" && !finished;
+    const isHost = s.view.room.host_id === session?.user.id;
+    sheetMenu.show({
+      title: "Partie",
+      message: `Salon ${s.view.room.name} · code ${s.view.room.code}`,
+      actions: [
+        ...(isHost && !finished
+          ? [
+              s.game.phase === "paused"
+                ? { label: "Reprendre", icon: "play" as IconName, onPress: () => void c.resume() }
+                : { label: "Mettre en pause", icon: "pause" as IconName, onPress: () => void c.pause() },
+              {
+                label: "Terminer la partie",
+                icon: "square" as IconName,
+                tone: "destructive" as const,
+                onPress: () =>
+                  Alert.alert("Terminer la partie ?", "La partie se termine immédiatement pour tous (égalité, non comptée).", [
+                    { text: "Annuler", style: "cancel" },
+                    { text: "Terminer", style: "destructive", onPress: () => void c.abort() },
+                  ]),
+              },
+            ]
+          : []),
+        {
+          label: active ? "Retour au salon (partage GPS en pause)" : "Retour au salon",
+          icon: "users" as IconName,
+          onPress: () => router.replace(`/room/${s.view.room.id}`),
+        },
+      ],
+    });
+  }, [s, c, session?.user.id, sheetMenu, router]);
+
+  // Retour Android : jamais de sortie silencieuse de la partie (le partage GPS
+  // s'arrêterait sans prévenir). On ferme le panneau, sinon on ouvre le menu.
+  useBackHandler(() => {
+    if (!s || s.game.phase === "finished") return false;
+    if (sheet) setSheet(false);
+    else hostMenu();
+    return true;
+  });
+
   if (!id) return null;
   if (g.error && !s) {
     return (
@@ -192,7 +237,6 @@ export default function GameScreen() {
 
   const finished = s.game.phase === "finished";
   const active = s.me.status === "active" && !finished;
-  const isHost = s.view.room.host_id === session?.user.id;
   const cfg = s.game.config;
   const ms = remaining(s, g.now);
 
@@ -228,26 +272,6 @@ export default function GameScreen() {
         },
       ],
     );
-
-  const hostMenu = () =>
-    Alert.alert("Partie", `Salon ${s.view.room.name} · code ${s.view.room.code}`, [
-      ...(isHost && !finished
-        ? [
-            s.game.phase === "paused" ? { text: "Reprendre", onPress: () => void c.resume() } : { text: "Mettre en pause", onPress: () => void c.pause() },
-            {
-              text: "Terminer la partie",
-              style: "destructive" as const,
-              onPress: () =>
-                Alert.alert("Terminer la partie ?", "La partie se termine immédiatement pour tous (égalité, non comptée).", [
-                  { text: "Annuler", style: "cancel" },
-                  { text: "Terminer", style: "destructive", onPress: () => void c.abort() },
-                ]),
-            },
-          ]
-        : []),
-      { text: "Retour au salon", onPress: () => router.replace(`/room/${s.view.room.id}`) },
-      { text: "Fermer", style: "cancel" as const },
-    ]);
 
   const capture = async () => {
     const r = await c.capture();
@@ -327,7 +351,7 @@ export default function GameScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.abyss }}>
       {active && (settings.keepAwake || getSettings().keepAwake) ? <KeepAwake /> : null}
-      <GameMap ref={mapRef} state={s} now={g.now} />
+      <GameMap ref={mapRef} state={s} now={Math.floor(g.now / 1000) * 1000} />
 
       <SafeAreaView edges={["top"]} style={styles.top} pointerEvents="box-none">
         <View style={styles.hud}>
@@ -368,17 +392,19 @@ export default function GameScreen() {
         ) : null}
       </SafeAreaView>
 
-      <View style={styles.mapButtons}>
-        <IconButton icon="navigation" label="Centrer sur moi" onPress={() => mapRef.current?.recenter()} tint={colors.ivory} />
-        <IconButton icon="maximize" label="Voir toute la zone" onPress={() => mapRef.current?.showZone()} tint={colors.ivory} />
-      </View>
+      {sheet ? null : (
+        <View style={styles.mapButtons}>
+          <IconButton icon="navigation" label="Centrer sur moi" onPress={() => mapRef.current?.recenter()} tint={colors.ivory} />
+          <IconButton icon="maximize" label="Voir toute la zone" onPress={() => mapRef.current?.showZone()} tint={colors.ivory} />
+        </View>
+      )}
 
       <SafeAreaView edges={["bottom"]} style={styles.bottom}>
         {sheet ? <Sheet s={s} now={g.now} online={g.online} tab={tab} setTab={setTab} /> : null}
         {finished ? (
           <View style={styles.dock}>
             <T v="heading" color={s.game.winner === "hunter" ? colors.hunter : s.game.winner === "fugitive" ? colors.fugitive : colors.ivory}>
-              {s.game.winner === "draw" ? "Égalité" : `Victoire des ${TEAM_LABEL[s.game.winner!]}`}
+              {s.game.winner === "hunter" || s.game.winner === "fugitive" ? `Victoire des ${TEAM_LABEL[s.game.winner]}` : "Égalité"}
             </T>
             <T v="small">Le partage de position est arrêté.</T>
             <View style={{ flexDirection: "row", gap: space.sm }}>

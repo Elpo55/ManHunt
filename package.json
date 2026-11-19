@@ -1,6 +1,6 @@
 {
   "name": "projet-traque",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Jeu de traque géolocalisé multijoueur (Android / iOS) — monorepo.",
   "workspaces": [
@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p packages/shared/tsconfig.json && npm run typecheck -w apps/mobile",
     "lint": "npm run lint -w apps/mobile",
     "mobile": "npm run start -w apps/mobile",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "release:apk": "node scripts/release-apk.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",

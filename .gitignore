@@ -53,3 +53,8 @@ apps/mobile/.env
 apps/mobile/android/
 apps/mobile/ios/
 apps/mobile/dist/
+# APK livrés : conservés localement dans releases/ (trop lourds pour Git) ;
+# CHANGELOG.md et BUILD_REPORT.md de chaque version sont versionnés.
+releases/**/*.apk
+*.jks
+*.keystore

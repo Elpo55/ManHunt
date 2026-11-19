@@ -55,7 +55,7 @@ export default function Results() {
       </Screen>
     );
   }
-  const w = s.game.winner!;
+  const w = s.game.winner === "hunter" || s.game.winner === "fugitive" ? s.game.winner : "draw";
   const mine = s.final?.find((f) => f.u === s.me.u);
   return (
     <Guard>

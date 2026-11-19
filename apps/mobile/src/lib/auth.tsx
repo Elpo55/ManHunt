@@ -15,6 +15,8 @@ interface AuthCtx {
   configured: boolean;
   session: Session | null;
   profile: Profile | null;
+  /** Échec du chargement du profil (réseau, serveur) : l'interface propose de réessayer. */
+  profileError: AppError | null;
   refreshProfile: () => Promise<void>;
   signInGuest: () => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<void>;
@@ -49,24 +51,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(!isConfigured);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState<AppError | null>(null);
 
   const loadProfile = useCallback(async (uid: string | undefined) => {
     const sb = getSupabase();
-    if (!sb || !uid) return setProfile(null);
-    const { data } = await sb.from("profiles").select("*").eq("id", uid).maybeSingle();
-    setProfile((data as Profile) ?? null);
+    if (!sb || !uid) {
+      setProfile(null);
+      setProfileError(null);
+      return;
+    }
+    // Le profil est créé par un déclencheur à l'inscription : on retente
+    // brièvement s'il n'est pas encore visible, puis on signale l'échec
+    // au lieu de rester indéfiniment sur « Chargement ».
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { data, error } = await sb.from("profiles").select("*").eq("id", uid).maybeSingle();
+        if (error) throw error;
+        if (data) {
+          setProfile(data as Profile);
+          setProfileError(null);
+          return;
+        }
+      } catch (e) {
+        if (attempt === 2) {
+          setProfile(null);
+          setProfileError(toAppError(e));
+          return;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    }
+    setProfile(null);
+    setProfileError(new AppError("E_PROFILE_MISSING"));
   }, []);
 
   useEffect(() => {
     const sb = getSupabase();
     if (!sb) return;
     let alive = true;
-    sb.auth.getSession().then(async ({ data }) => {
-      if (!alive) return;
-      setSession(data.session);
-      await loadProfile(data.session?.user.id);
-      if (alive) setReady(true);
-    });
+    sb.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!alive) return;
+        setSession(data.session);
+        await loadProfile(data.session?.user.id);
+      })
+      .catch((e) => {
+        if (alive) setProfileError(toAppError(e));
+      })
+      .finally(() => {
+        if (alive) setReady(true);
+      });
     const { data: sub } = sb.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       setTimeout(() => void loadProfile(s?.user.id), 0);
@@ -88,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       configured: isConfigured,
       session,
       profile,
+      profileError,
       refreshProfile: () => loadProfile(session?.user.id),
       signInGuest: async () => {
         const { error } = await sb().auth.signInAnonymously();
@@ -110,9 +146,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await stopTracking(); // aucun partage ne survit à une déconnexion
         await sb().auth.signOut();
         setProfile(null);
+        setProfileError(null);
       },
     };
-  }, [ready, session, profile, loadProfile]);
+  }, [ready, session, profile, profileError, loadProfile]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

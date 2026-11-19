@@ -60,6 +60,8 @@ export class GameController {
   private disposed = false;
   private latestFix: DeviceFix | null = null;
   private sendingFix = false;
+  private lastSendAt = 0;
+  private sendTimer: ReturnType<typeof setTimeout> | null = null;
   onEvent: ((ev: GameEvent, s: GameState) => void) | null = null;
   onError: ((e: AppError) => void) | null = null;
 
@@ -93,6 +95,7 @@ export class GameController {
     this.disposed = true;
     if (this.resyncTimer) clearTimeout(this.resyncTimer);
     if (this.gapTimer) clearTimeout(this.gapTimer);
+    if (this.sendTimer) clearTimeout(this.sendTimer);
     this.listeners.clear();
   }
 
@@ -216,7 +219,10 @@ export class GameController {
   /**
    * Reçoit une mesure GPS. Affichage local immédiat ; envoi au serveur de la
    * mesure la plus récente seulement (les précédentes non envoyées sont
-   * abandonnées).
+   * abandonnées), au plus une fois par intervalle de la partie
+   * (position_interval_s, 3 s minimum) : iOS ignore l'intervalle demandé au
+   * GPS et les flux premier plan / arrière-plan peuvent se cumuler, alors que
+   * le serveur refuse plus de 3 envois en 3 s.
    */
   submitFix = (fix: DeviceFix) => {
     this.latestFix = fix;
@@ -225,13 +231,28 @@ export class GameController {
     void this.flushFix();
   };
 
+  /** Intervalle minimal entre deux envois de position (ms). */
+  sendIntervalMs(): number {
+    const cfg = this.snapshot.state?.game.config;
+    return Math.max(3, cfg?.position_interval_s ?? 5) * 1000;
+  }
+
   private async flushFix() {
-    if (this.sendingFix || !this.latestFix || this.disposed) return;
+    if (this.sendingFix || !this.latestFix || this.disposed || this.sendTimer) return;
     const s = this.snapshot.state;
     if (!s || s.game.phase === "finished" || s.me.status !== "active") return;
+    const wait = this.lastSendAt + this.sendIntervalMs() - Date.now();
+    if (wait > 0) {
+      this.sendTimer = setTimeout(() => {
+        this.sendTimer = null;
+        void this.flushFix();
+      }, wait);
+      return;
+    }
     const fix = this.latestFix;
     this.latestFix = null;
     this.sendingFix = true;
+    this.lastSendAt = Date.now();
     this.set({ uplink: { ...this.snapshot.uplink, status: "sending" } });
     try {
       // Horodatage converti sur l'horloge serveur (téléphones mal réglés).
@@ -305,6 +326,8 @@ export class GameController {
   leave = async () => void (await this.act("leave", () => this.api.leaveGame(this.gameId)));
   safetyStop = async () => {
     this.latestFix = null;
+    if (this.sendTimer) clearTimeout(this.sendTimer);
+    this.sendTimer = null;
     await this.act("safety", () => this.api.safetyStop(this.gameId));
     await this.load();
   };

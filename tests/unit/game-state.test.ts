@@ -148,10 +148,32 @@ describe("contrôleur", () => {
     c.submitFix(fix(2000)); // pendant l'envoi
     c.submitFix(fix(3000)); // remplace la précédente
     await vi.advanceTimersByTimeAsync(500);
+    expect(a.sent).toHaveLength(1); // la suivante attend l'intervalle de la partie
+    await vi.advanceTimersByTimeAsync(c.sendIntervalMs());
     expect(a.sent).toHaveLength(2);
     expect(a.sent[1] - 3000).toBeGreaterThan(59_000); // décalage serveur appliqué
     expect(c.getSnapshot().uplink.status).toBe("ok");
     expect(c.state!.device!.timestamp).toBe(3000);
+  });
+
+  it("limite les envois à un par intervalle même si le GPS émet en rafale (iOS, double flux)", async () => {
+    const a = api();
+    const c = new GameController("g", a);
+    await c.load();
+    const interval = c.sendIntervalMs();
+    expect(interval).toBeGreaterThanOrEqual(3000);
+    // 1 mesure toutes les 500 ms pendant 30 s, en double (premier plan + arrière-plan).
+    for (let t = 0; t < 30_000; t += 500) {
+      c.submitFix({ lat: ZONE.lat, lng: ZONE.lng, accuracy: 5, timestamp: t });
+      c.submitFix({ lat: ZONE.lat, lng: ZONE.lng, accuracy: 5, timestamp: t });
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    await vi.advanceTimersByTimeAsync(interval);
+    expect(a.sent.length).toBeLessThanOrEqual(Math.ceil(30_000 / interval) + 1);
+    expect(a.sent.length).toBeGreaterThanOrEqual(Math.floor(30_000 / interval));
+    // La dernière mesure finit toujours par partir (jamais perdue).
+    expect(a.sent[a.sent.length - 1] - c.clock.offset).toBeCloseTo(29_500, -1);
+    c.dispose();
   });
 
   it("arrête d'envoyer quand la partie est finie et remonte les erreurs", async () => {

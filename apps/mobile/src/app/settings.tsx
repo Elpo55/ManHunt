@@ -6,7 +6,7 @@ import { Guard } from "../components/Guard";
 import { Button, Notice, Panel, Screen, SectionTitle, Stat, T, Toggle, useToast } from "../components/ui";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { APP_NAME, mapProvider } from "../lib/env";
+import { APP_BUILD, APP_NAME, APP_VERSION, mapProvider } from "../lib/env";
 import { useSettings } from "../lib/settings";
 import { space } from "../theme";
 
@@ -68,6 +68,9 @@ export default function Settings() {
           <Button label="Gérer les autorisations" variant="secondary" icon="map-pin" onPress={() => router.push("/permissions")} />
         </Panel>
         {profile?.is_admin ? <AdminUsage /> : null}
+        <T v="caption" style={{ textAlign: "center" }}>
+          {`Version ${APP_VERSION} (build ${APP_BUILD})`}
+        </T>
         <Notice>
           {`${APP_NAME} est un nom provisoire. Carte : ${mapProvider.label}, données © OpenStreetMap contributors.`}
         </Notice>

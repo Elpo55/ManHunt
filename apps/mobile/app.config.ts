@@ -10,6 +10,21 @@
  * Aucune clé secrète Supabase (service_role) ne doit jamais apparaître ici.
  */
 import type { ConfigContext, ExpoConfig } from "expo/config";
+import { version as VERSION } from "./package.json";
+
+/**
+ * Version : source unique = apps/mobile/package.json (versionnement sémantique).
+ * Numéro de build (Android versionCode / iOS buildNumber) dérivé et toujours
+ * croissant : MAJEUR*10000 + MINEUR*100 + CORRECTIF (0.3.0 -> 300, 1.2.3 -> 10203).
+ */
+export function buildNumber(v: string): number {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
+  if (!m) throw new Error(`Version invalide : ${v}`);
+  const [maj, min, pat] = m.slice(1).map(Number);
+  if (min > 99 || pat > 99) throw new Error(`Mineur/correctif limités à 99 : ${v}`);
+  return maj * 10000 + min * 100 + pat;
+}
+const BUILD = buildNumber(VERSION);
 
 const NAME = process.env.EXPO_PUBLIC_APP_NAME?.trim() || "Projet Traque";
 const BUNDLE_ID = process.env.APP_BUNDLE_ID?.trim() || "com.example.projettraque";
@@ -24,13 +39,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: NAME,
   slug: "projet-traque",
   scheme: "traque",
-  version: "0.2.0",
+  version: VERSION,
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
   backgroundColor: "#050608",
   ios: {
     bundleIdentifier: BUNDLE_ID,
+    buildNumber: String(BUILD),
     supportsTablet: false,
     infoPlist: {
       NSLocationWhenInUseUsageDescription: LOCATION_TEXT,
@@ -40,6 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: BUNDLE_ID,
+    versionCode: BUILD,
     adaptiveIcon: {
       backgroundColor: "#050608",
       foregroundImage: "./assets/android-icon-foreground.png",

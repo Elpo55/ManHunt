@@ -103,54 +103,78 @@ export interface TrackingResult {
   background: boolean;
 }
 
+/**
+ * Les démarrages/arrêts sont sérialisés : sans cela, un arrêt lancé pendant
+ * un démarrage (fin de partie, changement d'écran rapide) pouvait laisser un
+ * abonnement GPS actif après la partie (watchPositionAsync résolu après le
+ * stop) ou effacer la partie mémorisée d'un nouveau démarrage.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+let generation = 0;
+function serialized<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn, fn);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
 /** Démarre le suivi pour une partie. N'appelle jamais les invites de permission. */
-export async function startTracking(gameId: string, intervalS: number, offsetMs: number, onFix: FixListener): Promise<TrackingResult> {
-  listener = onFix;
-  const interval = Math.max(3, intervalS) * 1000;
-  await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify({ gameId, intervalS: Math.max(3, intervalS), startedAt: Date.now(), offsetMs } satisfies ActiveTracking));
+export function startTracking(gameId: string, intervalS: number, offsetMs: number, onFix: FixListener): Promise<TrackingResult> {
+  const gen = ++generation;
+  return serialized(async () => {
+    // Un arrêt (ou un autre démarrage) a été demandé entre-temps : rien à faire.
+    if (gen !== generation) return { foreground: false, background: false };
+    listener = onFix;
+    const interval = Math.max(3, intervalS) * 1000;
+    await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify({ gameId, intervalS: Math.max(3, intervalS), startedAt: Date.now(), offsetMs } satisfies ActiveTracking));
 
-  const fg = await Location.getForegroundPermissionsAsync();
-  if (!fg.granted) return { foreground: false, background: false };
+    const fg = await Location.getForegroundPermissionsAsync();
+    if (!fg.granted) return { foreground: false, background: false };
 
-  watch?.remove();
-  watch = await Location.watchPositionAsync(
-    { accuracy: Location.Accuracy.High, timeInterval: interval, distanceInterval: 3, mayShowUserSettingsDialog: true },
-    (l) => listener?.(toFix(l)),
-  );
+    watch?.remove();
+    watch = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.High, timeInterval: interval, distanceInterval: 3, mayShowUserSettingsDialog: true },
+      (l) => listener?.(toFix(l)),
+    );
 
-  let background = false;
-  const bg = await Location.getBackgroundPermissionsAsync();
-  if (bg.granted) {
-    try {
-      await Location.startLocationUpdatesAsync(BACKGROUND_TASK, {
-        accuracy: Location.Accuracy.High,
-        timeInterval: interval,
-        distanceInterval: 5,
-        pausesUpdatesAutomatically: false,
-        activityType: Location.ActivityType.Fitness,
-        showsBackgroundLocationIndicator: true,
-        foregroundService: {
-          notificationTitle: "Partage de position actif",
-          notificationBody: "Pendant la partie uniquement. Ouvrez l'application pour l'arrêter.",
-          notificationColor: "#2F6BFF",
-          killServiceOnDestroy: true,
-        },
-      });
-      background = true;
-    } catch {
-      background = false; // repli : premier plan seulement
+    let background = false;
+    const bg = await Location.getBackgroundPermissionsAsync();
+    if (bg.granted) {
+      try {
+        await Location.startLocationUpdatesAsync(BACKGROUND_TASK, {
+          accuracy: Location.Accuracy.High,
+          timeInterval: interval,
+          distanceInterval: 5,
+          pausesUpdatesAutomatically: false,
+          activityType: Location.ActivityType.Fitness,
+          showsBackgroundLocationIndicator: true,
+          foregroundService: {
+            notificationTitle: "Partage de position actif",
+            notificationBody: "Pendant la partie uniquement. Ouvrez l'application pour l'arrêter.",
+            notificationColor: "#2F6BFF",
+            killServiceOnDestroy: true,
+          },
+        });
+        background = true;
+      } catch {
+        background = false; // repli : premier plan seulement
+      }
     }
-  }
-  return { foreground: true, background };
+    return { foreground: true, background };
+  });
 }
 
 /** Arrête tout suivi (premier plan + arrière-plan) et oublie la partie. */
-export async function stopTracking(): Promise<void> {
+export function stopTracking(): Promise<void> {
+  ++generation;
+  // Effet immédiat : plus aucune mesure n'est transmise, même avant la fin de la file.
   listener = null;
-  watch?.remove();
-  watch = null;
-  await AsyncStorage.removeItem(ACTIVE_KEY);
-  await stopBackgroundUpdates();
+  return serialized(async () => {
+    listener = null;
+    watch?.remove();
+    watch = null;
+    await AsyncStorage.removeItem(ACTIVE_KEY).catch(() => undefined);
+    await stopBackgroundUpdates();
+  });
 }
 
 /** À l'ouverture de l'application : coupe un suivi orphelin (partie terminée, crash…). */

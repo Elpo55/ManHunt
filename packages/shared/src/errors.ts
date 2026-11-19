@@ -49,6 +49,7 @@ const MESSAGES: Record<string, string> = {
   E_GPS_IMPRECISE: "Signal GPS trop imprécis pour capturer.",
   E_OUT_OF_ZONE: "Vous êtes hors de la zone de jeu.",
   E_NETWORK: "Connexion impossible. Vérifiez votre réseau.",
+  E_PROFILE_MISSING: "Votre profil est introuvable sur le serveur. Réessayez ou reconnectez-vous.",
   E_NOT_CONFIGURED: "Le serveur n'est pas configuré (variables Supabase manquantes).",
 };
 

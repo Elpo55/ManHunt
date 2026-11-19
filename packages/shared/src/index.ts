@@ -13,3 +13,4 @@ export * from "./avatars";
 export * from "./map/provider";
 export * from "./map/style";
 export * from "./map/geocode";
+export * from "./next";

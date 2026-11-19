@@ -9,7 +9,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, Share, View } from "react-native";
 import { Guard } from "../../../components/Guard";
-import { Avatar, Button, Loading, Notice, Panel, Screen, SectionTitle, Segmented, T, TeamTag, Toggle, useToast } from "../../../components/ui";
+import { Avatar, Button, Loading, Notice, Panel, Screen, SectionTitle, Segmented, T, TeamTag, Toggle, useActionSheet, useToast, type SheetAction } from "../../../components/ui";
 import { api, type RoomMember, type RoomState } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { useLocationPermissions } from "../../../lib/location/permissions";
@@ -36,6 +36,7 @@ export default function Lobby() {
   const userId = session?.user.id ?? null;
   const router = useRouter();
   const toast = useToast();
+  const sheetMenu = useActionSheet();
   const room = useRoom(id ?? null, userId);
   const perms = useLocationPermissions();
   const [busy, setBusy] = useState<string | null>(null);
@@ -84,17 +85,19 @@ export default function Lobby() {
   const memberMenu = (m: RoomMember) => {
     if (!isHost || m.user_id === userId) return;
     const setTeam = (t: Team | null) => run("team", () => api.setMemberTeam(s.room.id, m.user_id, t));
-    Alert.alert(m.username, undefined, [
+    const actions: SheetAction[] = [
       ...(lobby
         ? [
-            { text: "Chasseur", onPress: () => setTeam("hunter") },
-            { text: "Fugitif", onPress: () => setTeam("fugitive") },
+            { label: "Chasseur", icon: "crosshair" as const, onPress: () => setTeam("hunter") },
+            { label: "Fugitif", icon: "wind" as const, onPress: () => setTeam("fugitive") },
+            { label: "Sans équipe", icon: "help-circle" as const, onPress: () => setTeam(null) },
           ]
         : []),
-      { text: "Transmettre le rôle d'hôte", onPress: () => run("host", () => api.transferHost(s.room.id, m.user_id), `${m.username} est l'hôte.`) },
+      { label: "Transmettre le rôle d'hôte", icon: "star", onPress: () => run("host", () => api.transferHost(s.room.id, m.user_id), `${m.username} est l'hôte.`) },
       {
-        text: "Exclure du salon",
-        style: "destructive" as const,
+        label: "Exclure du salon",
+        icon: "user-x",
+        tone: "destructive",
         onPress: () =>
           Alert.alert("Exclure ?", "Le joueur pourra revenir avec le code, sauf si vous l'interdisez.", [
             { text: "Annuler", style: "cancel" },
@@ -102,8 +105,8 @@ export default function Lobby() {
             { text: "Exclure et interdire", style: "destructive", onPress: () => run("kick", () => api.kick(s.room.id, m.user_id, true)) },
           ]),
       },
-      { text: "Fermer", style: "cancel" as const },
-    ]);
+    ];
+    sheetMenu.show({ title: m.username, actions });
   };
 
   return (

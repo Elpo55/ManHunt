@@ -48,6 +48,8 @@ export function useGame(
   useEffect(() => {
     if (!gameId || !userId) return;
     const c = new GameController(gameId, gameApi);
+    // Le contrôleur vit le temps de l'effet (création + nettoyage symétriques).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setController(c);
     void c.load();
     void c.syncClock();
@@ -134,7 +136,6 @@ export function useGame(
   useEffect(() => {
     if (!controller || !shouldTrack) {
       void stopTracking();
-      setTracking(null);
       return;
     }
     let cancelled = false;
@@ -147,5 +148,6 @@ export function useGame(
     };
   }, [controller, shouldTrack, interval]);
 
-  return { state: s, error: snap.error, pending: snap.pending, uplink: snap.uplink, now, connection, online, tracking, controller };
+  // Résultat du dernier démarrage, pertinent seulement tant que le suivi doit tourner.
+  return { state: s, error: snap.error, pending: snap.pending, uplink: snap.uplink, now, connection, online, tracking: shouldTrack ? tracking : null, controller };
 }

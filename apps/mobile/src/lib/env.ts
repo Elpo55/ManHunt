@@ -1,5 +1,7 @@
 /** Variables publiques (EXPO_PUBLIC_*) — jamais de secret ici. */
 import { resolveProvider } from "@traque/shared";
+import * as Application from "expo-application";
+import Constants from "expo-constants";
 
 export const APP_NAME = process.env.EXPO_PUBLIC_APP_NAME?.trim() || "Projet Traque";
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
@@ -17,4 +19,10 @@ export const mapProvider = resolveProvider({
 
 export const GEOCODER_URL = process.env.EXPO_PUBLIC_GEOCODER_URL?.trim() || undefined;
 /** User-Agent identifiant l'application (exigé par la politique Nominatim). */
-export const USER_AGENT = `ProjetTraque/0.2 (application privée de jeu ; ${APP_NAME})`;
+/**
+ * Version réellement installée (lue dans l'application native compilée),
+ * avec repli sur la configuration embarquée (Expo Go / développement).
+ */
+export const APP_VERSION = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "?";
+export const APP_BUILD = Application.nativeBuildVersion ?? String(Constants.expoConfig?.android?.versionCode ?? "?");
+export const USER_AGENT = `ProjetTraque/${APP_VERSION} (application privée de jeu ; ${APP_NAME})`;

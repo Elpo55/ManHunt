@@ -1,11 +1,45 @@
 /** Garde d'accès : configuration serveur, session, profil complété. */
-import { Redirect } from "expo-router";
-import type { ReactNode } from "react";
+import { Redirect, useGlobalSearchParams, usePathname } from "expo-router";
+import { useState, type ReactNode } from "react";
 import { useAuth } from "../lib/auth";
-import { Loading, Notice, Screen, T } from "./ui";
+import { safeNext, withNext } from "@traque/shared";
+import { Button, Loading, Notice, Screen, T } from "./ui";
+
+/** Profil impossible à charger : jamais d'attente infinie, toujours une issue. */
+export function ProfileError() {
+  const { profileError, refreshProfile, signOut } = useAuth();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Screen>
+      <T v="title">Connexion au serveur impossible</T>
+      <Notice tone="error" icon="wifi-off">
+        {profileError?.message ?? "Le profil n'a pas pu être chargé."}
+      </Notice>
+      <Button
+        label="Réessayer"
+        icon="refresh-cw"
+        loading={busy}
+        onPress={async () => {
+          setBusy(true);
+          await refreshProfile().finally(() => setBusy(false));
+        }}
+      />
+      <Button label="Se déconnecter" variant="ghost" icon="log-out" onPress={() => void signOut().catch(() => undefined)} />
+    </Screen>
+  );
+}
 
 export function Guard({ children, requireProfile = true }: { children: ReactNode; requireProfile?: boolean }) {
-  const { configured, ready, session, profile } = useAuth();
+  const { configured, ready, session, profile, profileError } = useAuth();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  // Page demandée, conservée à travers connexion et création du profil
+  // (les paramètres de route dynamiques, déjà présents dans le chemin, sont exclus).
+  const query = Object.entries(params)
+    .filter(([k, v]) => k !== "next" && typeof v === "string" && !pathname.includes(v))
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join("&");
+  const here = safeNext(query ? `${pathname}?${query}` : pathname);
   if (!configured) {
     return (
       <Screen>
@@ -17,7 +51,8 @@ export function Guard({ children, requireProfile = true }: { children: ReactNode
     );
   }
   if (!ready) return <Loading label="Connexion au serveur" />;
-  if (!session) return <Redirect href="/login" />;
-  if (requireProfile && (!profile || !profile.username)) return profile ? <Redirect href="/onboarding" /> : <Loading />;
+  if (!session) return <Redirect href={withNext("/login", here)} />;
+  if (!profile) return profileError ? <ProfileError /> : <Loading label="Chargement du profil" />;
+  if (requireProfile && !profile.username) return <Redirect href={withNext("/onboarding", here)} />;
   return <>{children}</>;
 }
