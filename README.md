@@ -66,7 +66,7 @@ Voir [TESTING_GUIDE.md](TESTING_GUIDE.md), dont la procédure de test terrain av
 
 ## Versions et APK
 
-Version courante : **0.3.0** (build 300). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
+Version courante : **0.3.1** (build 301). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
 
 ## Historique
 

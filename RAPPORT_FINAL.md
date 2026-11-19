@@ -1,4 +1,36 @@
-# Rapport final — v0.2 « Projet Traque » mobile GPS
+# Rapport — v0.3.1 « Projet Traque » (stabilisation + premier APK)
+
+Date : 19 novembre 2026. Version **0.3.1**, build Android **301**. APK : `releases/v0.3.1/application-v0.3.1.apk`.
+
+## Bugs détectés et corrigés (v0.3.0 → v0.3.1)
+| Prio | Problème | Correction |
+|------|----------|-----------|
+| P0 | Positions (arrondies) de tous les joueurs lisibles par tout participant pendant 30 jours après la partie | Migration 0900 (appliquée au projet Supabase) + 3 tests |
+| P0 | Abonnement GPS pouvant survivre à la fin de partie (démarrage/arrêt concurrents) | Démarrages/arrêts sérialisés |
+| P0 | « Chargement » infini si le profil ne se charge pas | Écran d'erreur Réessayer / Se déconnecter, nouvelles tentatives |
+| P1 | Menus Android tronqués à 3 boutons (Exclure, Transmettre l'hôte invisibles) | Feuille d'actions |
+| P1 | Retour Android = sortie silencieuse de la partie et arrêt du GPS | Ouvre le menu de la partie |
+| P1 | Positions envoyées en rafale puis refusées par le serveur | Un envoi par intervalle + test |
+| P2 | Code d'invitation perdu sans connexion préalable | Destination conservée + tests |
+| P2 | Carte : propriétés natives recréées 2×/s ; boutons sur le panneau ; pas d'erreur de tuiles | 1 Hz, mémorisation, message |
+| P2 | Permissions Android superflues (stockage, superposition, biométrie, démarrage, FCM/badges) | Retirées (v0.3.1) |
+| P3 | « Victoire des undefined », 3 avertissements de lint, version non affichée | Corrigés ; version + build dans Réglages |
+
+## Vérifications effectuées
+- 85 tests automatisés réussis (27 unitaires, 58 PostgreSQL réel avec RLS), typage, lint (0 avertissement), `expo-doctor` 20/20, bundle JavaScript iOS compilé.
+- APK release compilé deux fois (0.3.0, 0.3.1) ; contrôles : version/build/identifiant (`aapt`), signature (`apksigner`), URL Supabase intégrée, jetons de rôle `anon` uniquement, aucune des clés secrètes du projet, aucun client de développement actif (manifeste).
+
+## Non vérifié (aucun appareil disponible)
+Installation et lancement de l'APK, GPS réel, arrière-plan, carte sur appareil, multijoueur sur deux téléphones, iOS natif, test de charge réseau. Procédure : TESTING_GUIDE §1 bis.
+
+## Problèmes encore présents / limites
+- APK signé avec la clé de **débogage** : test uniquement ; clé personnelle à créer par vous avant publication (DEPLOYMENT_GUIDE §0).
+- Modes Mister X / Royale non développés ; pas de notifications hors application ; pas de mises à jour OTA.
+- Comportement en arrière-plan dépendant du constructeur (à valider sur votre téléphone).
+
+---
+
+# Rapport final — v0.2 « Projet Traque » mobile GPS (historique)
 
 Date : 18 novembre 2026.
 

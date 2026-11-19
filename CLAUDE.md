@@ -48,4 +48,4 @@ Toute nouvelle version finalisée entraîne, sans qu'on ait à le redemander :
 - Le client ne modifie jamais l'état du jeu directement : tout passe par des RPC serveur.
 - Positions : privées côté serveur, arrondies avant diffusion, effacées 24 h après la partie.
 - Android `Alert.alert` : 3 boutons maximum → utiliser `useActionSheet()` pour les menus.
-- Windows : le build natif passe par `subst` (limite de 260 caractères de CMake/ninja) — géré par le script.
+- Windows : le build natif se fait dans le worktree `C:/tqb` avec CMake ≥ 3.30 / ninja ≥ 1.12 (limite de 260 caractères) — géré par le script.

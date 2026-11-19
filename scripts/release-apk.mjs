@@ -247,7 +247,10 @@ if (secrets) {
   if (secrets.some((k) => bundle.includes(k))) fail("Une clé secrète du projet Supabase est présente dans le bundle : livraison refusée.");
   secretCheck = `jetons embarqués tous de rôle \`anon\` ; aucune des ${secrets.length} clés secrètes du projet présente`;
 }
-const devClient = listing.includes("expo-dev-launcher") || bundle.includes("DevLauncher");
+// Client de développement actif = activité du lanceur déclarée dans le manifeste.
+// (Le nom « EXDevLauncher » figure toujours dans le bundle : Expo teste l'existence du module.)
+const manifest = out(bt("aapt"), ["dump", "xmltree", apkBuilt, "AndroidManifest.xml"]);
+const devClient = /DevLauncherActivity|DevMenuActivity/.test(manifest) || listing.includes("expo-dev-launcher");
 
 // ---------------------------------------------------------------- livraison
 mkdirSync(outDir, { recursive: true });

@@ -2,7 +2,7 @@
 
 Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] (à vérifier)` à contrôler · `[!]` bloqué (compte, paiement ou appareil requis).
 
-État au 19 novembre 2026 — **version 0.3.0 (build 300)**.
+État au 19 novembre 2026 — **version 0.3.1 (build 301)**.
 
 ---
 
@@ -13,12 +13,13 @@ Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] 
 - [x] **Supabase configuré** (projet `ibyntjdoongvrvrieicn`, eu-west-1) : 9 migrations appliquées, 13 tables avec RLS, invité ON, confirmation e-mail OFF, limite invités 100/h/IP, Realtime privé + Presence, pg_cron (`pt-tick`, `pt-cleanup`).
 - [x] `apps/mobile/.env` rempli (URL, clé publique *anon*, `APP_BUNDLE_ID=com.elpo55.syceus`).
 - [x] v0.3.0 : audit complet et corrections (voir CHANGELOG.md), 85 tests automatisés **exécutés et réussis**, typage et lint propres.
-- [x] **APK Android release compilé sur ce PC** : `releases/v0.3.0/application-v0.3.0.apk` (+ CHANGELOG, BUILD_REPORT). Signé avec la clé de **débogage** (test uniquement).
+- [x] v0.3.1 : permissions Android superflues retirées, contrôles de livraison fiabilisés.
+- [x] **APK Android release compilés sur ce PC** : `releases/v0.3.1/application-v0.3.1.apk` (**à installer**) ; `releases/v0.3.0/` conservé. Signés avec la clé de **débogage** (test uniquement). Contrôles statiques réussis ; **installation non testée** (aucun téléphone ni émulateur disponible).
 
 **Jamais réalisé à ce jour** : installation sur un téléphone, test GPS réel, partie à plusieurs appareils, build iOS. Ces étapes exigent vos appareils.
 
-## 0. Priorité : tester l'APK v0.3.0
-- [ ] Installer `releases/v0.3.0/application-v0.3.0.apk` sur votre Android (DEPLOYMENT_GUIDE §0).
+## 0. Priorité : tester l'APK v0.3.1
+- [ ] Installer `releases/v0.3.1/application-v0.3.1.apk` sur votre Android (DEPLOYMENT_GUIDE §0).
 - [ ] Dérouler TESTING_GUIDE §1 bis (8 points, ~15 min, idéalement avec un second téléphone).
 - [ ] M'envoyer les KO (modèle, version d'Android, capture d'écran si possible).
 - [ ] Après votre première connexion : me dire « je suis connecté » pour le compte administrateur (2.5).

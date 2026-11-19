@@ -29,19 +29,23 @@ releases/v0.3.0/
   BUILD_REPORT.md          (version, build, SHA-256, signature, permissions, vérifications)
 ```
 
-Il refuse d'écraser un APK déjà livré : augmentez d'abord la version. Prérequis : Android Studio (JDK intégré, `JAVA_HOME`), SDK Android (`ANDROID_HOME`) ; le NDK et CMake sont téléchargés automatiquement au premier build (~30 min la première fois, ~10 min ensuite). Sous Windows, le dépôt est monté temporairement sur un lecteur court (`subst`) pour contourner la limite de 260 caractères de la compilation C++.
+Il refuse d'écraser un APK déjà livré : augmentez d'abord la version, et refuse aussi de compiler si le code de l'application n'est pas commité (l'APK correspond toujours à un commit). Prérequis : Android Studio (JDK intégré, `JAVA_HOME`), SDK Android (`ANDROID_HOME`) ; le NDK est téléchargé automatiquement au premier build.
+
+Sous Windows, la compilation C++ dépasse la limite de 260 caractères :
+- le script compile dans une copie Git du commit à un chemin court, `C:/tqb` (modifiable : `TRAQUE_BUILD_DIR`), conservée entre deux builds (~7 min ensuite) ;
+- il faut **CMake ≥ 3.30 avec ninja ≥ 1.12** dans `%LOCALAPPDATA%\Android\Sdk\cmake\` (installé sur ce PC : `3.31.6`, depuis les archives officielles Kitware et ninja-build). Sur un autre PC : Android Studio → SDK Manager → SDK Tools → CMake (version 3.31 ou plus) ; ou copier `cmake-3.31.x-windows-x86_64` dans ce dossier et y ajouter `ninja.exe` 1.12.
 
 ### Signature de l'APK
 - **Par défaut : clé de débogage** publique du modèle React Native. Suffisant pour tester entre amis ; **non publiable** (Google Play la refuse) et n'importe qui la possède. Le rapport de build l'indique.
 - **Clé personnelle** (à créer **vous-même**, une seule fois, et à sauvegarder : sans elle, impossible de publier une mise à jour) :
   ```powershell
-  & "$env:JAVA_HOMEin\keytool.exe" -genkeypair -v -storetype PKCS12 `
-    -keystore "$env:USERPROFILE\cles	raque-release.jks" -alias traque `
+  & "$env:JAVA_HOME\bin\keytool.exe" -genkeypair -v -storetype PKCS12 `
+    -keystore "$env:USERPROFILE\cles\traque-release.jks" -alias traque `
     -keyalg RSA -keysize 4096 -validity 10000
   ```
   Conservez le fichier **hors du dépôt** (et une copie sauvegardée) et les mots de passe dans un gestionnaire. Puis, avant `npm run release:apk` :
   ```powershell
-  $env:TRAQUE_KEYSTORE = "$env:USERPROFILE\cles	raque-release.jks"
+  $env:TRAQUE_KEYSTORE = "$env:USERPROFILE\cles\traque-release.jks"
   $env:TRAQUE_KEY_ALIAS = "traque"
   $env:TRAQUE_KEYSTORE_PASSWORD = "…"; $env:TRAQUE_KEY_PASSWORD = "…"
   ```
@@ -80,7 +84,7 @@ iOS (compte Apple payant) : enregistrez chaque iPhone (`npx eas-cli device:creat
 - **Code JavaScript seulement** (écrans, logique) : recompiler le profil voulu, ou mettre en place EAS Update plus tard (`npx expo install expo-updates`, non configuré à ce stade).
 - **Changement natif** (nouvelle permission, nouveau module, `app.config.ts`) : nouveau build obligatoire.
 - **Base de données** : nouvelle migration dans `supabase/migrations/` puis `npx supabase db push`, **avant** de distribuer l'application qui en dépend.
-- Versions : **source unique `apps/mobile/package.json`** (versionnement sémantique). Le numéro de build Android (`versionCode`) et iOS (`buildNumber`) en est dérivé : `MAJEUR*10000 + MINEUR*100 + CORRECTIF` (0.3.0 → 300). `eas.json` utilise `appVersionSource: local` : un build EAS porte le même numéro qu'un APK local.
+- Versions : **source unique `apps/mobile/package.json`** (versionnement sémantique). Le numéro de build Android (`versionCode`) et iOS (`buildNumber`) en est dérivé : `MAJEUR*10000 + MINEUR*100 + CORRECTIF` (0.3.0 → 300, 0.3.1 → 301). `eas.json` utilise `appVersionSource: local` : un build EAS porte le même numéro qu'un APK local.
 
 ## 4. Revenir en arrière
 

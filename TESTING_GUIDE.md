@@ -5,7 +5,7 @@
 | Unitaires (logique partagée) | Vitest | non | non | ✅ exécutés (27) |
 | Base de données (intégration, sécurité, GPS, confidentialité, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel) | non | non | ✅ exécutés (58) |
 | Typage, lint, `expo-doctor`, bundles Metro Android/iOS | tsc, ESLint, Expo | non | non | ✅ exécutés |
-| APK release Android + contrôles (version, signature, configuration, secrets) | `npm run release:apk` | non | non | ✅ v0.3.0 (voir `releases/v0.3.0/BUILD_REPORT.md`) |
+| APK release Android + contrôles (version, signature, configuration, secrets) | `npm run release:apk` | non | non | ✅ v0.3.0, v0.3.1 (voir `releases/v*/BUILD_REPORT.md`) — contrôles statiques ; installation sur appareil non réalisée |
 | Test de charge réseau réel (20 clients Realtime) | `scripts/load-test.mjs` | **oui** | non | ⏳ à lancer par vous |
 | Tests sur téléphones (GPS, arrière-plan, carte) | procédures ci-dessous | **oui** | **oui** | ⏳ à faire par vous — **jamais réalisés à ce jour** |
 
