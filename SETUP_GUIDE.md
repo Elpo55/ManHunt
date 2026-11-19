@@ -26,9 +26,9 @@ Durée : ~45 min. Coût : 0 € (les seules options payantes, Apple et Google Pl
 ```bash
 npx supabase login
 npx supabase link --project-ref xxxx      # mot de passe de la base demandé
-npx supabase db push                      # applique supabase/migrations/0100 → 0800
+npx supabase db push                      # applique supabase/migrations/0100 → 0900
 ```
-Sans terminal : **SQL Editor → New query**, collez chaque fichier de `supabase/migrations/` **dans l'ordre** (0100 à 0800), **Run** à chaque fois.
+Sans terminal : **SQL Editor → New query**, collez chaque fichier de `supabase/migrations/` **dans l'ordre** (0100 à 0900), **Run** à chaque fois.
 
 ✅ **Table Editor** : 13 tables publiques, toutes « RLS enabled » ; `abilities` contient 8 lignes (dont 2 désactivées : `sprint`, `barrier`). Le schéma `private` contient `player_positions` et `position_history`.
 

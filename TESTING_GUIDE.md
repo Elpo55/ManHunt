@@ -2,9 +2,10 @@
 
 | Niveau | Outil | Projet Supabase ? | Appareil ? | État |
 |--------|-------|-------------------|-----------|------|
-| Unitaires (logique partagée) | Vitest | non | non | ✅ exécutés (25) |
-| Base de données (intégration, sécurité, GPS, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel) | non | non | ✅ exécutés (53) |
+| Unitaires (logique partagée) | Vitest | non | non | ✅ exécutés (27) |
+| Base de données (intégration, sécurité, GPS, confidentialité, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel) | non | non | ✅ exécutés (58) |
 | Typage, lint, `expo-doctor`, bundles Metro Android/iOS | tsc, ESLint, Expo | non | non | ✅ exécutés |
+| APK release Android + contrôles (version, signature, configuration, secrets) | `npm run release:apk` | non | non | ✅ v0.3.0 (voir `releases/v0.3.0/BUILD_REPORT.md`) |
 | Test de charge réseau réel (20 clients Realtime) | `scripts/load-test.mjs` | **oui** | non | ⏳ à lancer par vous |
 | Tests sur téléphones (GPS, arrière-plan, carte) | procédures ci-dessous | **oui** | **oui** | ⏳ à faire par vous — **jamais réalisés à ce jour** |
 
@@ -12,7 +13,7 @@
 
 ```bash
 npm install
-npm test                 # 78 tests
+npm test                 # 85 tests
 npm run test:unit        # géographie, configuration, état, couches carte, contrôleur, séquenceur, horloge
 npm run test:db          # salons, moteur GPS, sécurité, parité TS/SQL, cron, simulation
 npm run typecheck        # racine + shared + mobile
@@ -24,7 +25,22 @@ Couverture des tests base de données (PostgreSQL réel, rôles et RLS appliqué
 - **game.test.ts** : zone et consentement obligatoires ; aucune position initiale ; validation des positions (bornes, horodatage, ordre, **vitesse implausible**, distance) ; refus sans consentement / après la fin ; diffusion ~10 m aux coéquipiers et approximative + limitée aux adversaires ; précision jamais supérieure au GPS ; Fugitifs invisibles en préparation ; sortie de zone et élimination ; capture refusée hors zone ; captures par distance réelle (précision, fraîcheur, recharge, victoire) ; Infection et rotation du canal ; radar direction/distance, brouillage, signal perdu, secteur, zone, mode « impulsions » ; Fantôme, Leurre, Brouilleur, Scan, Traqueur, Sonar ; **arrêt de sécurité** (sortie + effacement) ; **rétention 24 h** ; vue de partie sans coordonnées adverses exactes ; pause ; fin du temps ; abandon.
 - **security.test.ts** : positions brutes inaccessibles à tous les clients, isolation des équipes, colonnes techniques, journal filtré, aucune écriture directe, fonctions privées inaccessibles, rôle anonyme, non-participant, autorisations des canaux Realtime, interdiction de diffuser, **aucune coordonnée brute dans aucun flux**, séquences contiguës.
 - **simulation.test.ts** : 20 joueurs marchant ~1,5 m/s pendant 6 min, envoi toutes les 5 s, poursuites et captures ; invariants et volume Realtime (~32 messages/s).
+- **privacy-events.test.ts** (v0.3.0) : après la partie, aucun événement de position de l'équipe adverse lisible ; effacement des événements de position 24 h après la fin ; arrêt de sécurité = effacement des événements de position du joueur.
 - **rooms.test.ts** : profils, salons, codes, force brute, équipes, hôte, exclusion, conditions de lancement.
+
+## 1 bis. Vérifier un APK livré (à chaque version)
+
+Installez `releases/vX.Y.Z/application-vX.Y.Z.apk` (DEPLOYMENT_GUIDE §0), puis :
+1. **Réglages** → « Version X.Y.Z (build N) » identique au dossier et au BUILD_REPORT.
+2. **Commencer → Jouer en invité** → pseudo → écran Localisation → Continuer → tableau de bord (pas de « Serveur non configuré »).
+3. **Mode avion** puis relance de l'application : écran « Connexion au serveur impossible » avec **Réessayer** (jamais de chargement infini) ; réseau rétabli → Réessayer fonctionne.
+4. Avec un second appareil : créer un salon, **Inviter** → le lien/code ; sur l'autre, déconnecté, ouvrir le lien `traque://join?code=…` → après connexion et pseudo, le salon s'ouvre directement.
+5. Lobby (hôte) : toucher un joueur → menu avec **Chasseur / Fugitif / Sans équipe / Transmettre le rôle d'hôte / Exclure** (5 actions visibles sur Android).
+6. En partie : **bouton retour Android** → ouvre le menu de la partie (ne quitte pas l'écran) ; menu hôte : Pause / Terminer / Retour au salon / Fermer.
+7. En partie, badge GPS « Partagée · ±x m » stable (pas de « Position refusée par le serveur » en marchant normalement).
+8. Fin de partie → **Résultats** → **Retour au salon** → **Nouvelle partie** ; vérifier que la notification « Partage de position actif » a disparu.
+
+Notez pour chaque point : OK / KO + modèle du téléphone + version d'Android.
 
 ## 2. Simuler 20 joueurs réels (charge réseau)
 

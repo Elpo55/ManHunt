@@ -57,6 +57,8 @@ Classique (complet) et Infection (le capturé devient Chasseur, rotation du topi
 | Fichier | Rôle |
 |---------|------|
 | `supabase/migrations/20261118000800_real_world_gps.sql` | modèle GPS, confidentialité, consentement, radar/captures/capacités GPS, rétention |
+| `supabase/migrations/20261119000900_position_events_privacy.sql` | lecture et rétention des événements porteurs de position (v0.3.0) |
+| `scripts/release-apk.mjs` | livraison Android : vérifications, APK release, contrôles, `releases/vX.Y.Z/` |
 | `packages/shared/src/controller.ts` | contrôleur de partie (séquences, resynchronisation, envoi GPS) |
 | `packages/shared/src/layers.ts` | couches cartographiques (zone, joueurs, précision, radar) |
 | `apps/mobile/src/lib/location/tracking.ts` | suivi GPS premier plan / arrière-plan, arrêts automatiques |

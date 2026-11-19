@@ -27,6 +27,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateRawSync } from "node:zlib";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MOBILE = join(ROOT, "apps", "mobile");
@@ -184,19 +185,67 @@ const perms = [...badging.matchAll(/uses-permission: name='([^']+)'/g)].map((x) 
 
 const verify = spawnSync(bt("apksigner"), ["verify", "--verbose", "--print-certs", apkBuilt], { encoding: "utf8", shell: isWin });
 if (verify.status !== 0) fail(`Signature invalide :\n${verify.stdout}${verify.stderr}`);
-const certDn = /Signer #1 certificate DN: (.*)/.exec(verify.stdout)?.[1] ?? "?";
-const certSha = /Signer #1 certificate SHA-256 digest: (\w+)/.exec(verify.stdout)?.[1] ?? "?";
+const certDn = /certificate DN: (.*)/.exec(verify.stdout)?.[1]?.trim() ?? "?";
+const certSha = /certificate SHA-256 digest: (\w+)/.exec(verify.stdout)?.[1] ?? "?";
+if (signing === "personal" && /CN=Android Debug/.test(certDn)) fail("Signature personnelle demandée mais l'APK est signé avec la clé de débogage.");
 const schemes = [...verify.stdout.matchAll(/Verified using (v[\d.]+) scheme[^:]*: true/g)].map((x) => x[1]).join(", ");
 
 // Bundle JavaScript : configuration publique présente, aucun secret.
 const listing = out(bt("aapt"), ["list", apkBuilt]);
 if (!listing.includes("assets/index.android.bundle")) fail("Bundle JavaScript absent de l'APK (build de développement ?).");
-const unzip = spawnSync("tar", ["-xOf", apkBuilt, "assets/index.android.bundle"], { maxBuffer: 256 * 1024 * 1024 });
-const bundle = unzip.status === 0 ? unzip.stdout.toString("latin1") : "";
-const bundleHasUrl = bundle.includes(new URL(supaUrl).host);
-const bundleSecret = /sb_secret_|service_role/.test(bundle);
-if (bundle && !bundleHasUrl) fail("L'URL Supabase n'est pas intégrée au bundle : l'application afficherait « Serveur non configuré ».");
-if (bundleSecret) fail("Une clé secrète Supabase semble présente dans le bundle : livraison refusée.");
+/** Lit une entrée d'un ZIP (APK) sans outil externe : répertoire central + inflate. */
+function readZipEntry(file, name) {
+  const buf = readFileSync(file);
+  let eocd = buf.length - 22;
+  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  if (eocd < 0) return null;
+  let p = buf.readUInt32LE(eocd + 16);
+  const n = buf.readUInt16LE(eocd + 10);
+  for (let i = 0; i < n; i++) {
+    const method = buf.readUInt16LE(p + 10);
+    const csize = buf.readUInt32LE(p + 20);
+    const fl = buf.readUInt16LE(p + 28);
+    const el = buf.readUInt16LE(p + 30);
+    const cl = buf.readUInt16LE(p + 32);
+    const local = buf.readUInt32LE(p + 42);
+    if (buf.toString("utf8", p + 46, p + 46 + fl) === name) {
+      const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+      const data = buf.subarray(start, start + csize);
+      return method === 0 ? data : inflateRawSync(data);
+    }
+    p += 46 + fl + el + cl;
+  }
+  return null;
+}
+const bundleBuf = readZipEntry(apkBuilt, "assets/index.android.bundle");
+if (!bundleBuf) fail("Impossible de lire le bundle JavaScript dans l'APK.");
+const bundle = bundleBuf.toString("latin1");
+if (!bundle.includes(new URL(supaUrl).host)) fail("L'URL Supabase n'est pas intégrée au bundle : l'application afficherait « Serveur non configuré ».");
+// Secrets : (1) tout JWT embarqué doit avoir le rôle « anon » ; (2) aucune des vraies
+// clés secrètes du projet (lues via la CLI Supabase si connectée, gardées en mémoire,
+// jamais affichées) n'est présente. NB : la simple chaîne « sb_secret_ » existe dans
+// supabase-js (détection de préfixe de clé) et n'est pas un secret.
+const jwtRoles = [...new Set(bundle.match(/eyJ[\w-]{10,}\.eyJ[\w-]{10,}\.[\w-]{10,}/g) ?? [])].map((t) => {
+  try {
+    return JSON.parse(Buffer.from(t.split(".")[1], "base64url").toString("utf8")).role ?? "?";
+  } catch {
+    return "?";
+  }
+});
+if (jwtRoles.some((r) => r !== "anon")) fail(`Jeton non public dans le bundle (rôles : ${jwtRoles.join(", ")}) : livraison refusée.`);
+let secretCheck = "jetons embarqués tous de rôle `anon` ; clés secrètes du projet non consultées (CLI Supabase non connectée)";
+const keysRun = spawnSync("npx", ["--no-install", "supabase", "projects", "api-keys", "--output-format", "json"], { cwd: ROOT, encoding: "utf8", shell: isWin });
+let secrets = null;
+try {
+  const j = JSON.parse(keysRun.stdout.slice(keysRun.stdout.indexOf("{")));
+  secrets = (j.keys ?? j).filter((k) => k.name !== "anon" && k.type !== "publishable").map((k) => k.api_key).filter((k) => k && k.length > 20);
+} catch {
+  /* CLI indisponible : contrôle des jetons seul */
+}
+if (secrets) {
+  if (secrets.some((k) => bundle.includes(k))) fail("Une clé secrète du projet Supabase est présente dans le bundle : livraison refusée.");
+  secretCheck = `jetons embarqués tous de rôle \`anon\` ; aucune des ${secrets.length} clés secrètes du projet présente`;
+}
 const devClient = listing.includes("expo-dev-launcher") || bundle.includes("DevLauncher");
 
 // ---------------------------------------------------------------- livraison
@@ -229,7 +278,9 @@ const git = (a) => {
 };
 const commit = commitSha.slice(0, 7);
 const dirty = false; // garanti : sources de l'application commitées (vérifié avant le build)
-const jdk = (spawnSync("java", ["-version"], { encoding: "utf8", shell: isWin, env: process.env }).stderr || "").split("\n")[0].trim();
+// JDK réellement utilisé par Gradle (JAVA_HOME), pas celui du PATH.
+const javaBin = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin", isWin ? "java.exe" : "java") : "java";
+const jdk = (spawnSync(javaBin, ["-version"], { encoding: "utf8" }).stderr || "").split("\n")[0].trim();
 const expoSdk = JSON.parse(readFileSync(join(ROOT, "node_modules", "expo", "package.json"), "utf8")).version;
 const rn = JSON.parse(readFileSync(join(ROOT, "node_modules", "react-native", "package.json"), "utf8")).version;
 const mins = ((Date.now() - t0) / 60000).toFixed(1);
@@ -260,8 +311,8 @@ ${checks.map((c) => `- ${mark(c.ok)} ${c.name}`).join("\n")}
 - ✅ Compilation Gradle \`assembleRelease\` terminée sans erreur
 - ✅ APK présent, lisible par \`aapt\`, version et identifiant conformes
 - ✅ Signature vérifiée par \`apksigner verify\`
-- ${bundle ? (bundleHasUrl ? "✅" : "❌") : "⚠️"} Configuration Supabase publique intégrée au bundle${bundle ? "" : " (non vérifiable : extraction impossible)"}
-- ✅ Aucune clé secrète Supabase (\`sb_secret_\`, \`service_role\`) dans le bundle
+- ✅ Configuration Supabase publique intégrée au bundle (URL du projet présente)
+- ✅ Aucun secret dans le bundle : ${secretCheck}
 - Installation sur téléphone : ${install}
 
 ## Permissions déclarées

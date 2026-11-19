@@ -10,7 +10,7 @@
 | Affichage approximatif | coéquipiers ~10 m, adversaires `max(approx_m, précision GPS)` sur une grille stable ; jamais plus précis que le GPS réel |
 | Fréquence limitée | envoi ≥ 3 s (5 s par défaut), diffusion aux adversaires ≤ 1 fois / `enemy_refresh_s` |
 | Accès réservé | canaux Realtime privés par audience, RLS ; le flux public ne contient jamais de coordonnées (testé) |
-| Rétention | positions brutes effacées 24 h après la fin de partie (`private.cleanup`, quotidien si pg_cron activé) ; historique approximatif des événements supprimé après 30 jours |
+| Rétention | positions brutes **et événements porteurs de position** (`pos`, `enemy_pos`, radar, révélations…) effacés 24 h après la fin de partie (`private.cleanup`, quotidien via pg_cron) ; autres événements (captures, statuts, fin) supprimés après 30 jours. Après la partie, un joueur ne lit que les événements sans position des autres équipes (migration 0900). Arrêt de sécurité / quitter : positions et événements de position du joueur effacés immédiatement. Les messages Realtime transitoires (`realtime.messages`) sont purgés par Supabase sous quelques jours. |
 | Retrait immédiat | `safety_stop` / `leave_game` : sortie de partie + effacement des positions brutes du joueur + arrêt du GPS |
 | Pas de suivi hors jeu | aucune fonction de localisation en dehors des parties ; suivi orphelin coupé au démarrage de l'application ; déconnexion = arrêt |
 

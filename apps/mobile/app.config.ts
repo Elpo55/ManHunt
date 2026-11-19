@@ -71,6 +71,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "FOREGROUND_SERVICE_LOCATION",
       "VIBRATE",
     ],
+    // Permissions ajoutées par défaut par des modules mais inutiles au jeu :
+    // retirées du manifeste final (moins d'accès, conformité Play Store).
+    blockedPermissions: [
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.USE_BIOMETRIC",
+      "android.permission.USE_FINGERPRINT",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+    ],
     predictiveBackGestureEnabled: false,
   },
   plugins: [

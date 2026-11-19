@@ -43,7 +43,8 @@ Prérequis : Node.js 20.9+, un projet Supabase configuré ([SETUP_GUIDE.md](SETU
 ```bash
 npm install
 cp apps/mobile/.env.example apps/mobile/.env   # renseigner l'URL et la clé publique Supabase
-npm test                                       # 78 tests
+npm test                                       # 85 tests
+npm run release:apk                            # APK Android release -> releases/vX.Y.Z/
 cd apps/mobile
 npx eas-cli build --profile development --platform android   # application de développement (une fois)
 npm run start                                  # serveur de développement, scanner le QR code
@@ -62,6 +63,10 @@ npm run test:load   # test de charge RÉEL (projet Supabase requis)
 ```
 
 Voir [TESTING_GUIDE.md](TESTING_GUIDE.md), dont la procédure de test terrain avec plusieurs téléphones.
+
+## Versions et APK
+
+Version courante : **0.3.0** (build 300). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
 
 ## Historique
 

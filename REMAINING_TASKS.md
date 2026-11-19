@@ -2,32 +2,36 @@
 
 Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] (à vérifier)` à contrôler · `[!]` bloqué (compte, paiement ou appareil requis).
 
-Temps estimé jusqu'à une première partie sur Android : **1 h 30 à 2 h** (dont ~30 min d'attente de compilation EAS).
+État au 19 novembre 2026 — **version 0.3.0 (build 300)**.
 
 ---
 
 ## Déjà fait
 
 - [x] Audit, sauvegardes (`v0.1.0-web`, branche `archive/web-real-world-map`), plan de migration (docs/MIGRATION_MOBILE_GPS.md).
-- [x] Migration serveur GPS `0800` (positions privées, arrondi, consentement, zone, captures/radar/capacités GPS, arrêt de sécurité, rétention).
-- [x] Monorepo : `packages/shared` (logique testée) + `apps/mobile` (Expo SDK 58, 15 écrans).
-- [x] 78 tests automatisés **exécutés et réussis** ; typage, lint, `expo-doctor` 20/20 ; bundles JavaScript Android et iOS compilés.
-- [x] Icônes originales, permissions natives, textes d'autorisation, profils EAS (`eas.json`), `apps/mobile/.env.example`.
-- [x] Dépôt Git local à jour (branche `main`).
+- [x] Monorepo : `packages/shared` (logique testée) + `apps/mobile` (Expo SDK 58, 15 écrans). Migrations serveur 0100 → 0900.
+- [x] **Supabase configuré** (projet `ibyntjdoongvrvrieicn`, eu-west-1) : 9 migrations appliquées, 13 tables avec RLS, invité ON, confirmation e-mail OFF, limite invités 100/h/IP, Realtime privé + Presence, pg_cron (`pt-tick`, `pt-cleanup`).
+- [x] `apps/mobile/.env` rempli (URL, clé publique *anon*, `APP_BUNDLE_ID=com.elpo55.syceus`).
+- [x] v0.3.0 : audit complet et corrections (voir CHANGELOG.md), 85 tests automatisés **exécutés et réussis**, typage et lint propres.
+- [x] **APK Android release compilé sur ce PC** : `releases/v0.3.0/application-v0.3.0.apk` (+ CHANGELOG, BUILD_REPORT). Signé avec la clé de **débogage** (test uniquement).
 
-**Rien n'a été créé chez Supabase, Expo, Apple, Google ou GitHub, aucune application n'a été compilée en natif ni installée, aucun test sur téléphone n'a été fait** : ces étapes exigent vos comptes et vos appareils.
+**Jamais réalisé à ce jour** : installation sur un téléphone, test GPS réel, partie à plusieurs appareils, build iOS. Ces étapes exigent vos appareils.
 
----
+## 0. Priorité : tester l'APK v0.3.0
+- [ ] Installer `releases/v0.3.0/application-v0.3.0.apk` sur votre Android (DEPLOYMENT_GUIDE §0).
+- [ ] Dérouler TESTING_GUIDE §1 bis (8 points, ~15 min, idéalement avec un second téléphone).
+- [ ] M'envoyer les KO (modèle, version d'Android, capture d'écran si possible).
+- [ ] Après votre première connexion : me dire « je suis connecté » pour le compte administrateur (2.5).
 
 ## 1. Comptes externes
 
-### 1.1 [!] Supabase
+### 1.1 [x] Supabase (fait)
 - **Objectif / utilité** : héberger le serveur du jeu (base, authentification, temps réel). Indispensable.
 - **Actions** : SETUP_GUIDE §1.1 (plan Free, région Europe, mot de passe généré et conservé).
 - **À récupérer** : URL du projet, clé publique (*anon* ou *publishable*), *Project ref*, mot de passe de la base.
 - **Vérification** : le tableau de bord du projet s'ouvre.
 
-### 1.2 [!] Expo (expo.dev)
+### 1.2 [ ] Expo (expo.dev) — facultatif depuis la v0.3.0 (APK compilés localement)
 - **Objectif** : compiler les applications Android/iOS dans le cloud (EAS Build, offre gratuite).
 - **Actions** : https://expo.dev/signup ; puis `cd apps/mobile && npx eas-cli@latest login`.
 - **Vérification** : `npx eas-cli whoami` affiche votre identifiant.
@@ -55,21 +59,21 @@ Temps estimé jusqu'à une première partie sur Android : **1 h 30 à 2 h** (don
 
 ## 2. Configuration Supabase
 
-### 2.1 [ ] Appliquer les migrations
+### 2.1 [x] Appliquer les migrations (fait, 0100 → 0900)
 - **Objectif** : créer tables, moteur GPS et sécurité.
 - **Actions** (racine du dépôt) : `npx supabase login` → `npx supabase link --project-ref xxxx` → `npx supabase db push`.
 - **Résultat attendu** : « Finished supabase db push ».
 - **Vérification** : Table Editor = 13 tables « RLS enabled », `abilities` = 8 lignes ; schéma `private` contient `player_positions`.
 
-### 2.2 [ ] Authentification
+### 2.2 [x] Authentification (fait)
 - **Actions** : SETUP_GUIDE §1.4 — **Allow anonymous sign-ins : ON** ; **Confirm email : OFF** (recommandé).
 - **Vérification** : « Jouer en invité » fonctionne dans l'application.
 
-### 2.3 [ ] Realtime privé
+### 2.3 [x] Realtime privé (fait)
 - **Actions** : SETUP_GUIDE §1.5 — désactiver **Allow public access**.
 - **Vérification** : le lobby affiche les joueurs en ligne (point vert) et se met à jour instantanément.
 
-### 2.4 [ ] pg_cron (recommandé : effacement automatique des positions)
+### 2.4 [x] pg_cron (fait)
 - **Actions** : SETUP_GUIDE §1.6.
 - **Vérification** : `select jobname from cron.job;` → `pt-tick`, `pt-cleanup`.
 
@@ -84,7 +88,7 @@ Temps estimé jusqu'à une première partie sur Android : **1 h 30 à 2 h** (don
 ### 3.1 [ ] Dépendances
 `npm install` à la racine (déjà fait sur ce PC ; à refaire ailleurs). **Vérification** : `npm test` → 78 tests réussis.
 
-### 3.2 [ ] Fichier `apps/mobile/.env`
+### 3.2 [x] Fichier `apps/mobile/.env` (fait)
 - **Actions** : `cp apps/mobile/.env.example apps/mobile/.env` puis renseigner `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `APP_BUNDLE_ID` (ex. `com.prenomnom.traque`, **définitif après publication**).
 - **Vérification** : `git status` ne montre pas ce fichier.
 
@@ -101,7 +105,9 @@ Temps estimé jusqu'à une première partie sur Android : **1 h 30 à 2 h** (don
 - **Résultat** : lien/QR d'installation de l'APK (10–30 min, file gratuite).
 - **Vérification** : l'application « Projet Traque » (icône réticule) s'ouvre sur le téléphone.
 
-### 4.2 [ ] Sauvegarder la clé de signature
+### 4.2 [ ] Clé de signature personnelle (avant toute publication)
+- **Pour les APK locaux** : la créer vous-même avec `keytool` (DEPLOYMENT_GUIDE §0 « Signature »), la stocker hors du dépôt et la sauvegarder ; je l'utiliserai via les variables `TRAQUE_KEYSTORE…`.
+- **Pour les builds EAS** :
 - **Pourquoi** : sans elle, impossible de mettre à jour l'application publiée.
 - **Actions** : `npx eas-cli credentials` → Android → *Download keystore* → stocker en lieu sûr (hors dépôt).
 
