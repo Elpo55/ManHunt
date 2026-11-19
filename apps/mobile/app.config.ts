@@ -111,10 +111,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     ["expo-camera", { cameraPermission: CAMERA_TEXT, recordAudioAndroid: false, microphonePermission: false }],
+    // Déclaré AVANT expo-notifications : les modifications natives s'exécutent en ordre
+    // inverse, ce plugin passe donc après et retire l'autorisation push (notifications
+    // LOCALES uniquement ; signature possible avec un compte Apple gratuit).
+    "./plugins/withoutPushEntitlement",
     ["expo-notifications", { color: "#2F6BFF" }],
     "expo-updates",
-    // Après expo-notifications : notifications LOCALES uniquement (compte Apple gratuit possible).
-    "./plugins/withoutPushEntitlement",
   ],
   // EAS Update : actif seulement si le projet est relié à expo.dev (EAS_PROJECT_ID).
   // runtimeVersion = version de l'application : une mise à jour JavaScript n'est

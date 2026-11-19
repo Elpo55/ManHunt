@@ -48,7 +48,9 @@ const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
 if (!m) fail(`Version invalide dans apps/mobile/package.json : ${version}`);
 const build = Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]);
 const outDir = join(ROOT, "releases", `v${version}`);
-const apkOut = join(outDir, `application-v${version}.apk`);
+// Nom de livraison : Manhunt-vX.Y.Z.apk (v0.3.x : application-vX.Y.Z.apk, conservés tels quels).
+const deliveredName = `Manhunt-v${version}.apk`;
+const apkOut = join(outDir, deliveredName);
 if (existsSync(apkOut)) fail(`${apkOut} existe déjà. Un APK livré n'est jamais remplacé : augmentez la version (apps/mobile/package.json).`);
 
 // ---------------------------------------------------------------- outils
@@ -261,7 +263,7 @@ const sizeMb = (statSync(apkOut).size / 1048576).toFixed(1);
 const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
 const sec = new RegExp(`^## \\[?${version.replaceAll(".", "\\.")}\\]?[^\\n]*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, "m").exec(changelog);
 if (!sec) fail(`Section « ## ${version} » absente de CHANGELOG.md.`);
-writeFileSync(join(outDir, "CHANGELOG.md"), `# Projet Traque — v${version} (build ${build})\n\n${sec[0].split("\n").slice(1).join("\n").trim()}\n`);
+writeFileSync(join(outDir, "CHANGELOG.md"), `# Manhunt — v${version} (build ${build})\n\n${sec[0].split("\n").slice(1).join("\n").trim()}\n`);
 
 let install = "non demandée (`--install`)";
 if (args.has("--install")) {
@@ -297,7 +299,7 @@ writeFileSync(
 | | |
 |---|---|
 | Date | ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC |
-| Fichier | \`releases/v${version}/application-v${version}.apk\` (${sizeMb} Mo) |
+| Fichier | \`releases/v${version}/${deliveredName}\` (${sizeMb} Mo) |
 | SHA-256 | \`${sha256}\` |
 | Type | **APK release** (bundle JavaScript intégré, sans serveur de développement)${devClient ? " — ⚠️ contient le client de développement" : ""} |
 | Identifiant | \`${apkPkg}\` |
@@ -323,7 +325,7 @@ ${checks.map((c) => `- ${mark(c.ok)} ${c.name}`).join("\n")}
 ${perms.map((p) => `\`${p}\``).join(", ")}
 
 ## Installation
-1. Copier \`application-v${version}.apk\` sur le téléphone (câble, Drive, e-mail…), ou \`adb install -r releases/v${version}/application-v${version}.apk\`.
+1. Copier \`${deliveredName}\` sur le téléphone (câble, Drive, e-mail…), ou \`adb install -r releases/v${version}/${deliveredName}\`.
 2. Ouvrir le fichier, autoriser « Installer des applications inconnues » pour l'application utilisée.
 3. Une version précédente **signée avec la même clé** est mise à jour en conservant la session. Si Android refuse (« conflit de signature »), désinstaller l'ancienne version d'abord.
 `,
