@@ -3,7 +3,7 @@ import { resolveProvider } from "@traque/shared";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
 
-export const APP_NAME = process.env.EXPO_PUBLIC_APP_NAME?.trim() || "Projet Traque";
+export const APP_NAME = process.env.EXPO_PUBLIC_APP_NAME?.trim() || "Manhunt";
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
 export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
 export const isConfigured = /^https:\/\/.+/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
@@ -25,4 +25,4 @@ export const GEOCODER_URL = process.env.EXPO_PUBLIC_GEOCODER_URL?.trim() || unde
  */
 export const APP_VERSION = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "?";
 export const APP_BUILD = Application.nativeBuildVersion ?? String(Constants.expoConfig?.android?.versionCode ?? "?");
-export const USER_AGENT = `ProjetTraque/${APP_VERSION} (application privée de jeu ; ${APP_NAME})`;
+export const USER_AGENT = `Manhunt/${APP_VERSION} (application privée de jeu ; ${APP_NAME})`;

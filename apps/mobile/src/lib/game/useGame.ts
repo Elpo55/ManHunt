@@ -7,9 +7,10 @@
  *  - tick aux échéances serveur, heartbeat, resynchronisation au retour au premier plan.
  */
 import { GameController, type AppError, type GameEvent, type GameState } from "@traque/shared";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { gameApi } from "../api";
+import { healthReport } from "../device";
 import { startTracking, stopTracking, type TrackingResult } from "../location/tracking";
 import { useChannel, type ChannelStatus } from "../realtime/useChannel";
 
@@ -65,7 +66,8 @@ export function useGame(
 
   const snap = useSyncExternalStore(controller?.subscribe ?? noopSubscribe, controller?.getSnapshot ?? emptySnapshot, emptySnapshot);
   const s = snap.state;
-  const teamTopic = s ? (s.view.team_topic ?? `game:${s.game.id}:${s.me.team}`) : null;
+  // Canal d'équipe réservé aux joueurs actifs (un spectateur n'y a plus droit côté serveur).
+  const teamTopic = s && (s.me.status === "active" || s.game.phase === "finished") ? (s.view.team_topic ?? `game:${s.game.id}:${s.me.team}`) : null;
   const handlers = controller
     ? { onMessage: (_e: string, p: unknown) => controller.handleEvent(p as GameEvent), onSubscribed: () => controller.scheduleResync(400) }
     : { onMessage: () => {}, onSubscribed: () => {} };
@@ -78,7 +80,7 @@ export function useGame(
   });
   const sTeam = useChannel({ topic: controller && teamTopic ? teamTopic : null, events: ["ev"], ...handlers });
   const sMe = useChannel({ topic: controller && userId ? `game:${controller.gameId}:p:${userId}` : null, events: ["ev"], ...handlers });
-  const statuses = [sAll, sTeam, sMe];
+  const statuses = teamTopic ? [sAll, sTeam, sMe] : [sAll, sMe];
   const connection: ChannelStatus = statuses.includes("offline")
     ? "offline"
     : statuses.includes("retrying")
@@ -101,6 +103,16 @@ export function useGame(
       clearTimeout(first);
       clearInterval(id);
     };
+  }, [controller]);
+
+  // État de l'appareil joint au heartbeat (batterie, GPS, premier plan).
+  const gpsRef = useRef<"ok" | "searching" | "denied">("searching");
+  useEffect(() => {
+    const fix = s?.device;
+    gpsRef.current = !opts.locationGranted ? "denied" : fix && Date.now() - fix.timestamp < 60_000 ? "ok" : "searching";
+  });
+  useEffect(() => {
+    controller?.setHealthProvider(() => healthReport(gpsRef.current));
   }, [controller]);
 
   // Heartbeat + resynchronisation au retour au premier plan.

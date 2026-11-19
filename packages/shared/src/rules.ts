@@ -36,7 +36,7 @@ export const TEAM_SINGULAR: Record<Team, string> = { hunter: "Chasseur", fugitiv
 export const enemyOf = (t: Team): Team => (t === "hunter" ? "fugitive" : "hunter");
 
 export interface ModeInfo {
-  id: GameMode | "mister_x" | "royale";
+  id: GameMode;
   label: string;
   summary: string;
   available: boolean;
@@ -45,8 +45,35 @@ export interface ModeInfo {
 export const MODES: ModeInfo[] = [
   { id: "classic", label: "Classique", summary: "Les Chasseurs doivent capturer tous les Fugitifs avant la fin du temps.", available: true },
   { id: "infection", label: "Infection", summary: "Chaque Fugitif capturé rejoint les Chasseurs.", available: true },
-  { id: "mister_x", label: "Mister X", summary: "Un seul Fugitif, révélé périodiquement, contre tous les autres.", available: false },
-  { id: "royale", label: "Royale", summary: "La zone de jeu se resserre progressivement.", available: false },
+  { id: "misterx", label: "Mister X", summary: "Un seul Fugitif, invisible, dont la position exacte est révélée à intervalle régulier.", available: true },
+  { id: "royale", label: "Royale", summary: "La zone se resserre par étapes : restez dans le cercle ou soyez éliminé.", available: true },
+];
+export const MODE_LABEL: Record<GameMode, string> = { classic: "Classique", infection: "Infection", misterx: "Mister X", royale: "Royale" };
+
+/** Messages rapides d'équipe (pas de texte libre). */
+export const QUICK_MESSAGES: { code: string; label: string; icon: string }[] = [
+  { code: "seen", label: "Je le vois", icon: "eye" },
+  { code: "help", label: "Besoin d'aide", icon: "life-buoy" },
+  { code: "danger", label: "Attention", icon: "alert-triangle" },
+  { code: "moving", label: "Je me déplace", icon: "navigation" },
+  { code: "hiding", label: "Je me cache", icon: "eye-off" },
+  { code: "regroup", label: "On se regroupe", icon: "users" },
+  { code: "north", label: "Je vais au nord", icon: "arrow-up" },
+  { code: "south", label: "Je vais au sud", icon: "arrow-down" },
+  { code: "east", label: "Je vais à l'est", icon: "arrow-right" },
+  { code: "west", label: "Je vais à l'ouest", icon: "arrow-left" },
+  { code: "marked", label: "Position signalée", icon: "map-pin" },
+  { code: "safe", label: "Tout va bien", icon: "check" },
+];
+export const QUICK_LABEL: Record<string, string> = Object.fromEntries(QUICK_MESSAGES.map((m) => [m.code, m.label]));
+
+/** Repères de carte d'équipe. */
+export const MARKER_KINDS: { kind: "enemy" | "danger" | "meet" | "objective" | "info"; label: string; color: string }[] = [
+  { kind: "enemy", label: "Adversaire vu", color: "#ff5a4e" },
+  { kind: "danger", label: "Danger", color: "#e8b14a" },
+  { kind: "meet", label: "Rendez-vous", color: "#4fd1a5" },
+  { kind: "objective", label: "Objectif", color: "#2f6bff" },
+  { kind: "info", label: "Info", color: "#ece8df" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -125,4 +152,6 @@ export const SAFETY_RULES: string[] = [
   "Aucun contact physique n'est nécessaire : la capture se fait par proximité GPS.",
   "Vous pouvez arrêter le partage de votre position à tout moment (bouton Arrêt).",
   "Votre position n'est partagée que pendant la partie, avec ses seuls participants.",
+  "En cas de problème, utilisez le bouton SOS : la partie est suspendue pour tous.",
+  "En cas de danger réel, appelez les secours (112 en Europe) : Manhunt n'est pas un service d'urgence.",
 ];

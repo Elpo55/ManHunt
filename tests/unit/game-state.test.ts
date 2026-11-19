@@ -15,7 +15,7 @@ import {
   type GameView,
 } from "@shared";
 
-const ZONE = { lat: 48.8556, lng: 2.2986, radius_m: 500, label: "Test", set: true };
+const ZONE = { lat: 48.8556, lng: 2.2986, radius_m: 500, label: "Test", set: true, shape: "circle" as const, polygon: [], forbidden: [] };
 
 function view(): GameView {
   const now = Date.now();
@@ -108,6 +108,31 @@ describe("couches cartographiques", () => {
   });
 });
 
+describe("état v0.4.0", () => {
+  it("SOS, repères, messages, zone Royale, GPS muet et resynchronisation après capture", () => {
+    let s = fromView(view());
+    expect(s.ext.markers).toEqual([]); // serveur ancien : extensions par défaut
+    s = applyEvent(s, { s: "all", sn: 6, t: "sos", d: { u: "f1", username: "F1", message: "Aide", at: 1, lat: null, lng: null, acc: null }, at: 1 });
+    expect(s.ext.sos?.message).toBe("Aide");
+    s = applyEvent(s, { s: "all", sn: 7, t: "sos_resolved", d: { by: "h1" }, at: 2 });
+    expect(s.ext.sos).toBeNull();
+    s = applyEvent(s, { s: "hunter", sn: 8, t: "marker", d: { id: "m1", u: "h1", kind: "danger", lat: 1, lng: 1, expires_at: 100 }, at: 3 });
+    s = applyEvent(s, { s: "hunter", sn: 9, t: "team_msg", d: { u: "h1", code: "help", at: 4 }, at: 4 });
+    expect(s.ext.markers).toHaveLength(1);
+    expect(s.teamMessages.at(-1)?.code).toBe("help");
+    expect(pruneExpired(s, 200).ext.markers).toHaveLength(0);
+    s = applyEvent(s, { s: "all", sn: 10, t: "zone_shrink", d: { current: { lat: 1, lng: 1, radius_m: 300 }, next: null, next_at: null, stage: 3, stages: 3, warn_s: 60 }, at: 5 });
+    expect(s.ext.zone?.current?.radius_m).toBe(300);
+    s = applyEvent(s, { s: "all", sn: 11, t: "gps_silent", d: { u: "f1" }, at: 6 });
+    expect(s.ext.silent).toEqual(["f1"]);
+    s = applyEvent(s, { s: "all", sn: 12, t: "gps_ok", d: { u: "f1" }, at: 7 });
+    expect(s.ext.silent).toEqual([]);
+    expect(s.needsResync).toBe(false);
+    s = applyEvent(s, { s: "all", sn: 13, t: "capture", d: { h: "h1", f: "f1" }, at: 8 });
+    expect(s.needsResync).toBe(true); // le canal de l'équipe a changé
+  });
+});
+
 describe("contrôleur", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -135,6 +160,13 @@ describe("contrôleur", () => {
       abort: vi.fn(async () => {}),
       leaveGame: vi.fn(async () => {}),
       safetyStop: vi.fn(async () => {}),
+      teamMessage: vi.fn(async () => {}),
+      placeMarker: vi.fn(async () => ({ id: "m1", expires_at: Date.now() + 60_000 })),
+      removeMarker: vi.fn(async () => {}),
+      sos: vi.fn(async () => {}),
+      sosResolve: vi.fn(async () => {}),
+      captureToken: vi.fn(async () => ({ qr: "manhunt:cap:g:t", code: "ABCDEF", expires_at: Date.now() + 45_000 })),
+      captureByToken: vi.fn(async () => ({ captured: ["f1"], server_now: Date.now() })),
     };
   }
 

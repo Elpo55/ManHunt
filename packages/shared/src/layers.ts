@@ -6,9 +6,9 @@
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { circleRing, destination, DIR_ANGLE, isStale, sectorRing, type LngLat } from "./geo";
 import { enemyOf } from "./rules";
-import type { GameState } from "./state";
+import type { GameState, Objective, TeamMarker, ZoneCircle } from "./state";
 import { myDisplayPosition } from "./state";
-import type { LatLng, Team } from "./types";
+import type { GameZone, LatLng, Team } from "./types";
 
 export const MAP_COLORS = {
   volt: "#2f6bff",
@@ -140,4 +140,70 @@ export function captureRing(s: GameState): FC {
 
 export function sweepRing(center: LatLng, radiusM: number): FC {
   return fc([line(circleRing(center, Math.max(1, radiusM), 96))]);
+}
+
+const WORLD: LngLat[] = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+const closed = (pts: LatLng[]): LngLat[] => {
+  const ring = pts.map((p) => [p.lng, p.lat] as LngLat);
+  if (ring.length) ring.push(ring[0]);
+  return ring;
+};
+
+/**
+ * Aire de jeu effective : polygone ou cercle (zone courante en Royale), masque
+ * extérieur, zones interdites hachurées, prochain cercle Royale en pointillés.
+ */
+export function areaLayers(zone: GameZone, current: ZoneCircle | null = null, next: ZoneCircle | null = null): {
+  outline: FC;
+  mask: FC;
+  forbidden: FC;
+  next: FC;
+} {
+  const ring = current
+    ? circleRing(current, current.radius_m, 128)
+    : zone.shape === "polygon" && zone.polygon.length >= 3
+      ? closed(zone.polygon)
+      : circleRing(zone, zone.radius_m, 128);
+  const forbidden = (zone.forbidden ?? []).map((f) =>
+    polygon(f.kind === "polygon" ? closed(f.points) : circleRing(f, f.radius_m, 64), { label: f.label }),
+  );
+  return {
+    outline: fc([line(ring)]),
+    mask: fc([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [WORLD, [...ring].reverse()] } }]),
+    forbidden: fc(forbidden),
+    next: next ? fc([line(circleRing(next, next.radius_m, 128))]) : EMPTY_FC,
+  };
+}
+
+/** Balises (prises : grisées) et point d'extraction (actif seulement une fois ouvert). */
+export function objectiveLayers(objectives: Objective[], extractionOpen: boolean): FC {
+  return fc(
+    objectives.map((o) =>
+      point(o, {
+        kind: o.kind,
+        label: o.kind === "extraction" ? `${o.label}${extractionOpen ? "" : " (fermée)"}` : o.label,
+        color: o.kind === "extraction" ? (extractionOpen ? MAP_COLORS.fugitive : MAP_COLORS.stale) : o.claimed_by ? MAP_COLORS.stale : MAP_COLORS.warn,
+        claimed: !!o.claimed_by,
+      }),
+    ),
+  );
+}
+
+export function objectiveRings(objectives: Objective[]): FC {
+  return fc(objectives.filter((o) => !o.claimed_by).map((o) => line(circleRing(o, o.radius_m, 32))));
+}
+
+const MARKER_COLOR: Record<TeamMarker["kind"], string> = {
+  enemy: MAP_COLORS.hunter, danger: MAP_COLORS.warn, meet: MAP_COLORS.fugitive, objective: MAP_COLORS.volt, info: MAP_COLORS.ivory,
+};
+export function markerLayers(markers: TeamMarker[], now: number): FC {
+  return fc(markers.filter((m) => m.expires_at > now).map((m) => point(m, { kind: m.kind, color: MARKER_COLOR[m.kind] })));
+}
+
+/** Dernière révélation de Mister X (Chasseurs), estompée avec l'âge. */
+export function misterXLayer(s: GameState, now: number): FC {
+  const last = s.ext.misterx?.last;
+  if (!last || last.lat == null || last.lng == null || s.me.team !== "hunter") return EMPTY_FC;
+  const age = now - last.at;
+  return fc([point({ lat: last.lat, lng: last.lng }, { color: MAP_COLORS.fugitive, opacity: Math.max(0.35, 1 - age / 300_000) })]);
 }

@@ -26,13 +26,16 @@ export function buildNumber(v: string): number {
 }
 const BUILD = buildNumber(VERSION);
 
-const NAME = process.env.EXPO_PUBLIC_APP_NAME?.trim() || "Projet Traque";
+const NAME = process.env.EXPO_PUBLIC_APP_NAME?.trim() || "Manhunt";
 const BUNDLE_ID = process.env.APP_BUNDLE_ID?.trim() || "com.example.projettraque";
 
 const LOCATION_TEXT =
   "Votre position est partagée avec les joueurs de votre partie uniquement pendant une partie active, après votre accord. Le partage s'arrête à la fin de la partie ou quand vous appuyez sur Arrêt.";
 const BACKGROUND_TEXT =
   "Pour continuer la partie écran éteint, la position peut être envoyée en arrière-plan, uniquement pendant une partie active. Une notification reste visible tant que le partage est actif.";
+
+const CAMERA_TEXT = "La caméra sert uniquement à scanner le QR code d'un Fugitif pour confirmer une capture. Aucune photo n'est enregistrée.";
+const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID?.trim() || undefined;
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -52,6 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSLocationWhenInUseUsageDescription: LOCATION_TEXT,
       NSLocationAlwaysAndWhenInUseUsageDescription: BACKGROUND_TEXT,
       ITSAppUsesNonExemptEncryption: false,
+      NSCameraUsageDescription: CAMERA_TEXT,
     },
   },
   android: {
@@ -80,6 +84,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.USE_BIOMETRIC",
       "android.permission.USE_FINGERPRINT",
       "android.permission.RECEIVE_BOOT_COMPLETED",
+      // Notifications push distantes non utilisées (notifications locales seulement).
+      "com.google.android.c2dm.permission.RECEIVE",
+      "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+      "android.permission.RECORD_AUDIO",
     ],
     predictiveBackGestureEnabled: false,
   },
@@ -102,9 +110,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         isAndroidForegroundServiceEnabled: true,
       },
     ],
+    ["expo-camera", { cameraPermission: CAMERA_TEXT, recordAudioAndroid: false, microphonePermission: false }],
+    ["expo-notifications", { color: "#2F6BFF" }],
+    "expo-updates",
+    // Après expo-notifications : notifications LOCALES uniquement (compte Apple gratuit possible).
+    "./plugins/withoutPushEntitlement",
   ],
+  // EAS Update : actif seulement si le projet est relié à expo.dev (EAS_PROJECT_ID).
+  // runtimeVersion = version de l'application : une mise à jour JavaScript n'est
+  // jamais appliquée à un binaire d'une autre version (changements natifs = nouvel APK).
+  runtimeVersion: { policy: "appVersion" },
+  updates: EAS_PROJECT_ID
+    ? { enabled: true, url: `https://u.expo.dev/${EAS_PROJECT_ID}`, checkAutomatically: "ON_LOAD", fallbackToCacheTimeout: 0 }
+    : { enabled: false },
   experiments: { typedRoutes: false },
   extra: {
-    eas: process.env.EAS_PROJECT_ID ? { projectId: process.env.EAS_PROJECT_ID } : undefined,
+    eas: EAS_PROJECT_ID ? { projectId: EAS_PROJECT_ID } : undefined,
   },
 });

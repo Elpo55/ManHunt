@@ -13,13 +13,13 @@ import { AppError, toAppError } from "./errors";
 import { ServerClock } from "./clock";
 import { StreamSequencer } from "./sequencer";
 import type { AbilityKey, DeviceFix, GameEvent } from "./types";
-import { applyEvent, fromView, pruneExpired, streamsFor, withDevice, type GameState, type GameView } from "./state";
+import { applyEvent, fromView, pruneExpired, streamsFor, withDevice, type GameState, type GameView, type MarkerKind } from "./state";
 
 export interface GameApi {
   gameView: (id: string) => Promise<GameView>;
   serverTime: () => Promise<number>;
   tick: (id: string) => Promise<unknown>;
-  heartbeat: (id: string) => Promise<{ server_now: number }>;
+  heartbeat: (id: string, health?: HealthReport) => Promise<{ server_now: number }>;
   reportPosition: (id: string, fix: DeviceFix) => Promise<{ accepted: boolean; out_of_zone?: boolean; server_now: number }>;
   capture: (id: string) => Promise<{ captured: string[]; cooldown_until: number; server_now: number }>;
   radar: (id: string) => Promise<{ at: number; uses: number }>;
@@ -29,6 +29,26 @@ export interface GameApi {
   abort: (id: string) => Promise<void>;
   leaveGame: (id: string) => Promise<void>;
   safetyStop: (id: string) => Promise<void>;
+  teamMessage: (id: string, code: string) => Promise<void>;
+  placeMarker: (id: string, kind: MarkerKind, lat: number, lng: number) => Promise<{ id: string; expires_at: number }>;
+  removeMarker: (id: string, marker: string) => Promise<void>;
+  sos: (id: string, message: string, shareLocation: boolean) => Promise<void>;
+  sosResolve: (id: string, note: string) => Promise<void>;
+  captureToken: (id: string) => Promise<CaptureToken>;
+  captureByToken: (id: string, code: string) => Promise<{ captured: string[]; server_now: number }>;
+}
+
+/** État de l'appareil joint au heartbeat (lu via les API de l'OS, jamais contourné). */
+export interface HealthReport {
+  app_state?: "foreground" | "background";
+  gps_state?: "ok" | "searching" | "denied" | "off";
+  battery?: number | null;
+}
+
+export interface CaptureToken {
+  qr: string;
+  code: string;
+  expires_at: number;
 }
 
 export type UplinkStatus = "idle" | "sending" | "ok" | "rejected" | "offline";
@@ -63,12 +83,18 @@ export class GameController {
   private lastSendAt = 0;
   private sendTimer: ReturnType<typeof setTimeout> | null = null;
   onEvent: ((ev: GameEvent, s: GameState) => void) | null = null;
+  /** Fournit l'état de l'appareil (batterie, GPS, premier plan) au heartbeat. */
+  healthProvider: (() => HealthReport) | null = null;
   onError: ((e: AppError) => void) | null = null;
 
   constructor(
     readonly gameId: string,
     private api: GameApi,
   ) {}
+
+  setHealthProvider(fn: (() => HealthReport) | null) {
+    this.healthProvider = fn;
+  }
 
   setCallbacks(onEvent: GameController["onEvent"], onError: GameController["onError"]) {
     this.onEvent = onEvent;
@@ -192,7 +218,11 @@ export class GameController {
   nextDeadline(): number | null {
     const s = this.snapshot.state;
     if (!s || s.game.phase === "finished" || s.game.phase === "paused") return null;
-    const c = [s.game.phase_ends_at, s.game.next_radar_at].filter((x): x is number => typeof x === "number");
+    const ob = s.game.config.objectives;
+    const extraction = ob?.enabled && ob.extraction.set && !s.ext.extraction_open && s.game.phase_ends_at ? s.game.phase_ends_at - ob.extraction_open_s * 1000 : null;
+    const c = [s.game.phase_ends_at, s.game.next_radar_at, s.ext.zone?.next_at, s.ext.misterx?.next_at, extraction].filter(
+      (x): x is number => typeof x === "number",
+    );
     return c.length ? Math.min(...c) : null;
   }
 
@@ -208,7 +238,7 @@ export class GameController {
     if (this.snapshot.state?.game.phase === "finished") return;
     try {
       const t0 = Date.now();
-      const r = await this.api.heartbeat(this.gameId);
+      const r = await this.api.heartbeat(this.gameId, this.healthProvider?.() ?? undefined);
       this.clock.observe(t0, r.server_now, Date.now());
     } catch {
       /* réseau : la reconnexion est gérée par les canaux */
@@ -318,6 +348,25 @@ export class GameController {
     const s = this.snapshot.state;
     if (r && s) this.set({ state: { ...s, game: { ...s.game, radar_state: { radar_last: r.at, radar_uses: r.uses } } } });
     return !!r;
+  };
+
+  teamMessage = async (code: string) => !!(await this.act(`msg:${code}`, async () => (await this.api.teamMessage(this.gameId, code), true)));
+  placeMarker = async (kind: MarkerKind, lat: number, lng: number) => !!(await this.act("marker", () => this.api.placeMarker(this.gameId, kind, lat, lng)));
+  removeMarker = async (marker: string) => !!(await this.act("marker", async () => (await this.api.removeMarker(this.gameId, marker), true)));
+  sos = async (message: string, shareLocation: boolean) => {
+    const ok = !!(await this.act("sos", async () => (await this.api.sos(this.gameId, message, shareLocation), true)));
+    if (ok) await this.load();
+    return ok;
+  };
+  sosResolve = async (note: string) => {
+    const ok = !!(await this.act("sos", async () => (await this.api.sosResolve(this.gameId, note), true)));
+    if (ok) await this.load();
+    return ok;
+  };
+  captureToken = () => this.act("token", () => this.api.captureToken(this.gameId));
+  captureByToken = async (code: string): Promise<string[] | null> => {
+    const r = await this.act("capture", () => this.api.captureByToken(this.gameId, code));
+    return r ? r.captured : null;
   };
 
   pause = async () => void (await this.act("pause", () => this.api.pause(this.gameId)));

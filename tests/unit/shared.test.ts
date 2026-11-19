@@ -70,7 +70,7 @@ describe("configuration", () => {
     const c = normalizeConfig({ duration_s: 10, approx_m: 1, zone: { lat: 99, lng: 2, radius_m: 9999, label: "<b>x</b>" } });
     expect(c.duration_s).toBe(300);
     expect(c.approx_m).toBe(10);
-    expect(c.zone).toEqual({ lat: 85, lng: 2, radius_m: 3000, label: "bx/b", set: false });
+    expect(c.zone).toEqual({ lat: 85, lng: 2, radius_m: 3000, label: "bx/b", set: false, shape: "circle", polygon: [], forbidden: [] });
     expect(Object.keys(c.abilities).sort()).toEqual(["decoy", "ghost", "jammer", "scan", "sonar", "tracker"]);
     expect(normalizeConfig(null)).toEqual(DEFAULT_CONFIG);
   });
@@ -88,7 +88,7 @@ describe("règles et libellés", () => {
   it("machine à états, modes, capacités, radar", () => {
     expect(canTransition("lobby", "preparation")).toBe(true);
     expect(canTransition("finished", "running")).toBe(false);
-    expect(MODES.filter((m) => m.available).map((m) => m.id)).toEqual(["classic", "infection"]);
+    expect(MODES.filter((m) => m.available).map((m) => m.id)).toEqual(["classic", "infection", "misterx", "royale"]);
     expect(abilitiesFor("hunter").map((a) => a.key)).toEqual(["scan", "tracker", "sonar"]);
     expect(abilitiesFor("fugitive").map((a) => a.key)).toEqual(["ghost", "jammer", "decoy"]);
     expect(describeContact({ dir: "NE", band: "mid", dist_m: 250 })).toBe("Nord-Est, ~250 m");
@@ -152,5 +152,33 @@ describe("destination après connexion (next)", () => {
   it("encode la destination", () => {
     expect(withNext("/login", "/join?code=AB")).toBe("/login?next=%2Fjoin%3Fcode%3DAB");
     expect(withNext("/login", null)).toBe("/login");
+  });
+});
+
+import { areaLayers, markerLayers, objectiveLayers } from "../../packages/shared/src";
+
+describe("v0.4.0 : couches de carte et état étendu", () => {
+  const zone = normalizeConfig({ zone: { lat: 48.85, lng: 2.3, radius_m: 500, set: true, shape: "polygon",
+    polygon: [{ lat: 48.85, lng: 2.3 }, { lat: 48.86, lng: 2.3 }, { lat: 48.86, lng: 2.31 }],
+    forbidden: [{ kind: "circle", lat: 48.855, lng: 2.305, radius_m: 40 }] } }).zone;
+  it("aire de jeu : polygone fermé, zones interdites, prochain cercle Royale", () => {
+    const a = areaLayers(zone);
+    const ring = (a.outline.features[0].geometry as { coordinates: number[][] }).coordinates;
+    expect(ring).toHaveLength(4);
+    expect(ring[0]).toEqual(ring[3]);
+    expect(a.forbidden.features).toHaveLength(1);
+    expect(a.next.features).toHaveLength(0);
+    const r = areaLayers(zone, { lat: 48.85, lng: 2.3, radius_m: 300 }, { lat: 48.85, lng: 2.3, radius_m: 200 });
+    expect((r.outline.features[0].geometry as { coordinates: number[][] }).coordinates.length).toBeGreaterThan(100);
+    expect(r.next.features).toHaveLength(1);
+  });
+  it("balises, extraction fermée, repères expirés", () => {
+    const o = objectiveLayers([
+      { idx: 1, kind: "beacon", lat: 1, lng: 1, label: "A", radius_m: 25, claimed_by: null, claimed_at: null },
+      { idx: 0, kind: "extraction", lat: 2, lng: 2, label: "Parking", radius_m: 25, claimed_by: null, claimed_at: null },
+    ], false);
+    expect(o.features.map((f) => f.properties?.label)).toEqual(["A", "Parking (fermée)"]);
+    const m = markerLayers([{ id: "a", u: "u", kind: "danger", lat: 1, lng: 1, expires_at: 100 }, { id: "b", u: "u", kind: "meet", lat: 1, lng: 1, expires_at: 300 }], 200);
+    expect(m.features).toHaveLength(1);
   });
 });

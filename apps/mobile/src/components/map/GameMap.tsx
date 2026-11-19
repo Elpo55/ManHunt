@@ -7,6 +7,11 @@
 import { Camera, GeoJSONSource, Layer, Map, type CameraRef, type StyleSpecification } from "@maplibre/maplibre-react-native";
 import {
   MAP_COLORS,
+  areaLayers,
+  markerLayers,
+  misterXLayer,
+  objectiveLayers,
+  objectiveRings,
   buildDarkStyle,
   captureRing,
   myDisplayPosition,
@@ -14,8 +19,8 @@ import {
   radarLayers,
   sweepRing,
   zoneBounds,
-  zoneLayers,
   EMPTY_FC,
+  type FC,
   type GameState,
 } from "@traque/shared";
 import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
@@ -27,6 +32,7 @@ import { colors } from "../../theme";
 export interface GameMapHandle {
   recenter: () => void;
   showZone: () => void;
+  focus: (lat: number, lng: number) => void;
 }
 
 const mapStyle = (mapProvider.styleUrl ?? buildDarkStyle(mapProvider)) as string | StyleSpecification;
@@ -35,7 +41,16 @@ const mapStyle = (mapProvider.styleUrl ?? buildDarkStyle(mapProvider)) as string
  * `now` doit être arrondi par l'appelant (1 s) : la carte n'est alors
  * redessinée qu'à 1 Hz au plus, ou quand l'état change (memo).
  */
-export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: number }>(function GameMap({ state, now }, ref) {
+export interface GameMapProps {
+  state: GameState;
+  now: number;
+  /** positions différées (mode spectateur) */
+  spectators?: FC;
+  /** appui long sur la carte (pose d'un repère) */
+  onLongPress?: (lat: number, lng: number) => void;
+}
+
+export const GameMap = memo(forwardRef<GameMapHandle, GameMapProps>(function GameMap({ state, now, spectators, onLongPress }, ref) {
   const camera = useRef<CameraRef>(null);
   const zone = state.game.zone;
   const [failed, setFailed] = useState(false);
@@ -45,7 +60,12 @@ export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: n
     const b = zoneBounds(zone, zone.radius_m, 2);
     return [b.sw[0], b.sw[1], b.ne[0], b.ne[1]] as [number, number, number, number];
   }, [zone]);
-  const zl = useMemo(() => zoneLayers(zone), [zone]);
+  const royale = state.ext.zone;
+  const zl = useMemo(() => areaLayers(zone, royale?.current ?? null, royale?.next ?? null), [zone, royale]);
+  const objectives = useMemo(() => objectiveLayers(state.ext.objectives, state.ext.extraction_open), [state.ext.objectives, state.ext.extraction_open]);
+  const objRings = useMemo(() => objectiveRings(state.ext.objectives), [state.ext.objectives]);
+  const markers = useMemo(() => markerLayers(state.ext.markers, now), [state.ext.markers, now]);
+  const misterx = useMemo(() => misterXLayer(state, now), [state, now]);
   const players = useMemo(() => playerLayers(state, now), [state, now]);
   const radar = useMemo(() => radarLayers(state, now), [state, now]);
   const ring = useMemo(() => captureRing(state), [state]);
@@ -79,6 +99,7 @@ export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: n
       const me = myDisplayPosition(state);
       if (me) camera.current?.easeTo({ center: [me.lng, me.lat], zoom: 16.5, duration: 500 });
     },
+    focus: (lat: number, lng: number) => camera.current?.easeTo({ center: [lng, lat], zoom: 17, duration: 500 }),
     showZone: () => camera.current?.fitBounds([bounds.sw[0], bounds.sw[1], bounds.ne[0], bounds.ne[1]], { duration: 500, padding: { top: 120, bottom: 220, left: 24, right: 24 } }),
   }));
 
@@ -93,6 +114,7 @@ export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: n
         attributionPosition={ATTRIBUTION_POSITION}
         onDidFailLoadingMap={() => setFailed(true)}
         onDidFinishLoadingMap={() => setFailed(false)}
+        onLongPress={onLongPress ? (e) => onLongPress(e.nativeEvent.lngLat[1], e.nativeEvent.lngLat[0]) : undefined}
         logo={false}
         compass={false}
         touchRotate={false}
@@ -111,7 +133,31 @@ export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: n
           <Layer id="zone-mask" type="fill" paint={{ "fill-color": MAP_COLORS.abyss, "fill-opacity": 0.62 }} />
         </GeoJSONSource>
         <GeoJSONSource id="zone-outline" data={zl.outline}>
-          <Layer id="zone-outline" type="line" paint={{ "line-color": MAP_COLORS.ivory, "line-opacity": 0.4, "line-width": 1.5 }} />
+          <Layer id="zone-outline" type="line" paint={{ "line-color": royale ? MAP_COLORS.warn : MAP_COLORS.ivory, "line-opacity": royale ? 0.8 : 0.4, "line-width": royale ? 2.5 : 1.5 }} />
+        </GeoJSONSource>
+        <GeoJSONSource id="zone-forbidden" data={zl.forbidden}>
+          <Layer id="zone-forbidden-fill" type="fill" paint={{ "fill-color": MAP_COLORS.hunter, "fill-opacity": 0.22 }} />
+          <Layer id="zone-forbidden-line" type="line" paint={{ "line-color": MAP_COLORS.hunter, "line-opacity": 0.8, "line-width": 1.5, "line-dasharray": [2, 1] }} />
+        </GeoJSONSource>
+        <GeoJSONSource id="zone-next" data={zl.next}>
+          <Layer id="zone-next" type="line" paint={{ "line-color": MAP_COLORS.ivory, "line-opacity": 0.9, "line-width": 2, "line-dasharray": [3, 2] }} />
+        </GeoJSONSource>
+        <GeoJSONSource id="objective-rings" data={objRings}>
+          <Layer id="objective-rings" type="line" paint={{ "line-color": MAP_COLORS.warn, "line-opacity": 0.6, "line-width": 1.2 }} />
+        </GeoJSONSource>
+        <GeoJSONSource id="objectives" data={objectives}>
+          <Layer
+            id="objectives"
+            type="circle"
+            paint={{ "circle-radius": 7, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5 }}
+          />
+          <Layer
+            id="objectives-label"
+            type="symbol"
+            minzoom={14}
+            layout={{ "text-field": ["get", "label"], "text-font": ["Noto Sans Regular"], "text-size": 11, "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true }}
+            paint={{ "text-color": colors.ivory, "text-halo-color": "#0b0d11", "text-halo-width": 1.2 }}
+          />
         </GeoJSONSource>
 
         <GeoJSONSource id="radar-areas" data={radar.areas}>
@@ -135,6 +181,16 @@ export const GameMap = memo(forwardRef<GameMapHandle, { state: GameState; now: n
         </GeoJSONSource>
         <GeoJSONSource id="capture-ring" data={ring}>
           <Layer id="capture-ring" type="line" paint={{ "line-color": MAP_COLORS.hunter, "line-opacity": 0.55, "line-width": 1.2, "line-dasharray": [1, 2] }} />
+        </GeoJSONSource>
+
+        <GeoJSONSource id="markers" data={markers}>
+          <Layer id="markers" type="circle" paint={{ "circle-radius": 9, "circle-color": ["get", "color"], "circle-opacity": 0.35, "circle-stroke-color": ["get", "color"], "circle-stroke-width": 2.5 }} />
+        </GeoJSONSource>
+        <GeoJSONSource id="misterx" data={misterx}>
+          <Layer id="misterx" type="circle" paint={{ "circle-radius": 11, "circle-color": ["get", "color"], "circle-opacity": ["get", "opacity"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 }} />
+        </GeoJSONSource>
+        <GeoJSONSource id="spectators" data={spectators ?? EMPTY_FC}>
+          <Layer id="spectators" type="circle" paint={{ "circle-radius": 6, "circle-color": ["get", "color"], "circle-opacity": 0.7, "circle-stroke-color": MAP_COLORS.abyss, "circle-stroke-width": 1 }} />
         </GeoJSONSource>
 
         <GeoJSONSource id="accuracy" data={players.accuracy}>
