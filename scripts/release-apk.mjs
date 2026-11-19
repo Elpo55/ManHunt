@@ -88,7 +88,8 @@ if (!args.has("--skip-checks")) {
 //    un chemin long ; un lecteur « subst » ne suffit pas (l'autolinking Expo résout le
 //    vrai chemin et mélange les deux racines).
 function cleanup() {}
-const gitIn = (cwd, a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
+// core.longPaths : les intermédiaires C++ de la copie de build dépassent 260 caractères.
+const gitIn = (cwd, a) => execFileSync("git", ["-c", "core.longPaths=true", ...a], { cwd, encoding: "utf8" }).trim();
 const pending = gitIn(ROOT, ["status", "--porcelain", "--", "apps", "packages", "package.json", "package-lock.json"]);
 if (pending) fail(`Modifications non commitées dans le code de l'application :
 ${pending}
