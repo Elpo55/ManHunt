@@ -121,6 +121,19 @@ log("Génération du projet Android (expo prebuild --clean)");
 if (!sh("npx", ["--no-install", "expo", "prebuild", "--platform", "android", "--clean", "--no-install"], { cwd: mobile, env: { ...process.env, CI: "1" } }))
   fail("expo prebuild a échoué.");
 
+// CMake : la version la plus récente du SDK fournie avec un ninja >= 1.12 (gère les
+// chemins > 260 caractères sous Windows ; le ninja de CMake 3.22 échoue sur les
+// chemins des modules natifs). Voir DEPLOYMENT_GUIDE.md §0.
+const cmakeRoot = join(sdk, "cmake");
+const cmakeVer = existsSync(cmakeRoot)
+  ? readdirSync(cmakeRoot).filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop()
+  : null;
+if (isWin && (!cmakeVer || cmakeVer.localeCompare("3.30.0", undefined, { numeric: true }) < 0))
+  fail(`CMake >= 3.30 (avec ninja >= 1.12) requis dans ${cmakeRoot} : voir DEPLOYMENT_GUIDE.md §0.`);
+const props = (p) => p.replaceAll("\\", "/");
+const localProps = [`sdk.dir=${props(sdk)}`, cmakeVer ? `cmake.dir=${props(join(cmakeRoot, cmakeVer))}` : null].filter(Boolean);
+writeFileSync(join(android, "local.properties"), localProps.join("\n") + "\n");
+
 const gradleFile = join(android, "app", "build.gradle");
 const ks = process.env.TRAQUE_KEYSTORE;
 let signing = "debug";
@@ -239,7 +252,7 @@ writeFileSync(
 | Signature | ${signing === "debug" ? "⚠️ **clé de DÉBOGAGE** (modèle React Native) — test uniquement, non publiable" : "clé personnelle (TRAQUE_KEYSTORE)"} |
 | Certificat | ${certDn} · SHA-256 \`${certSha}\` · schémas ${schemes || "?"} |
 | Commit | \`${commit}\`${dirty ? " + modifications non commitées" : ""} |
-| Outils | Expo SDK ${expoSdk} · React Native ${rn} · ${jdk} · build-tools ${buildTools} |
+| Outils | Expo SDK ${expoSdk} · React Native ${rn} · ${jdk} · build-tools ${buildTools} · CMake ${cmakeVer ?? "défaut"} |
 | Durée | ${mins} min |
 
 ## Vérifications
