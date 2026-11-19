@@ -18,9 +18,9 @@
  *     (voir DEPLOYMENT_GUIDE.md §APK). Les mots de passe ne sont jamais écrits
  *     sur disque ni dans le rapport.
  *
- * Windows : la compilation C++ de React Native dépasse la limite de 260
- * caractères depuis un chemin long ; le dépôt est donc monté sur un lecteur
- * virtuel court (subst) le temps du build.
+ * Le build se fait dans un worktree Git du commit courant à un chemin court
+ * (C:\tqb sous Windows, modifiable via TRAQUE_BUILD_DIR) : APK = commit exact,
+ * et pas de dépassement de la limite de 260 caractères de CMake/ninja.
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -80,28 +80,39 @@ if (!args.has("--skip-checks")) {
   }
 } else checks.push({ name: "Vérifications", ok: null });
 
-// ---------------------------------------------------------------- lecteur court (Windows)
-let drive = null;
-function cleanup() {
-  if (drive) {
-    spawnSync("subst", [`${drive}`, "/D"], { shell: true });
-    drive = null;
-  }
+// ---------------------------------------------------------------- copie de build (commit exact, chemin court)
+// L'APK est compilé depuis un worktree Git du commit courant, à un chemin court :
+//  - reproductible : l'APK correspond exactement à un commit (sources non commitées refusées) ;
+//  - Windows : la compilation C++ (CMake/ninja) échoue au-delà de 260 caractères depuis
+//    un chemin long ; un lecteur « subst » ne suffit pas (l'autolinking Expo résout le
+//    vrai chemin et mélange les deux racines).
+function cleanup() {}
+const gitIn = (cwd, a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
+const pending = gitIn(ROOT, ["status", "--porcelain", "--", "apps", "packages", "package.json", "package-lock.json"]);
+if (pending) fail(`Modifications non commitées dans le code de l'application :
+${pending}
+Commitez-les d'abord : l'APK doit correspondre à un commit.`);
+const commitSha = gitIn(ROOT, ["rev-parse", "HEAD"]);
+const root = process.env.TRAQUE_BUILD_DIR || (isWin ? "C:\tqb" : join(ROOT, ".build-worktree"));
+log(`Copie de build : ${root} (commit ${commitSha.slice(0, 7)})`);
+if (!existsSync(join(root, ".git"))) {
+  if (existsSync(root) && readdirSync(root).length) fail(`${root} existe et n'est pas un worktree du dépôt.`);
+  gitIn(ROOT, ["worktree", "prune"]);
+  gitIn(ROOT, ["worktree", "add", "--detach", root, commitSha]);
+} else {
+  gitIn(root, ["checkout", "--detach", "--force", commitSha]);
+  // Fichiers générés supprimés (dont android/), dépendances conservées.
+  gitIn(root, ["clean", "-fdx", "-e", "node_modules", "-e", ".lock-hash"]);
 }
-process.on("exit", cleanup);
-let root = ROOT;
-if (isWin) {
-  const used = out("subst", []).toUpperCase();
-  for (const letter of "TUVWXYZRQP") {
-    if (!existsSync(`${letter}:\\`) && !used.includes(`${letter}:\\`)) {
-      drive = `${letter}:`;
-      break;
-    }
-  }
-  if (!drive) fail("Aucune lettre de lecteur libre pour subst.");
-  if (!sh("subst", [drive, ROOT])) fail("subst a échoué.");
-  root = `${drive}\\`;
+const lockHash = createHash("sha256").update(readFileSync(join(root, "package-lock.json"))).digest("hex");
+const lockMark = join(root, ".lock-hash");
+if (!existsSync(lockMark) || readFileSync(lockMark, "utf8") !== lockHash) {
+  log("Installation des dépendances (npm ci)");
+  if (!sh("npm", ["ci", "--no-audit", "--no-fund"], { cwd: root })) fail("npm ci a échoué dans la copie de build.");
+  writeFileSync(lockMark, lockHash);
 }
+// Configuration publique (jamais de secret) : .env local copié dans la copie de build.
+copyFileSync(join(MOBILE, ".env"), join(root, "apps", "mobile", ".env"));
 const mobile = join(root, "apps", "mobile");
 const android = join(mobile, "android");
 
@@ -131,7 +142,9 @@ if (ks) {
 
 // ---------------------------------------------------------------- compilation
 log(`Compilation de l'APK release (${ABIS})`);
-const gradlew = isWin ? "gradlew.bat" : "./gradlew";
+// Chemin absolu : sous Windows, le répertoire courant peut être exclu de la recherche
+// des exécutables (NoDefaultCurrentDirectoryInExePath).
+const gradlew = join(android, isWin ? "gradlew.bat" : "gradlew");
 const gradleOk = sh(gradlew, ["assembleRelease", `-PreactNativeArchitectures=${ABIS}`, "--no-daemon"], {
   cwd: android,
   env: { ...process.env, NODE_ENV: "production", CI: "1" },
@@ -201,8 +214,8 @@ const git = (a) => {
     return "?";
   }
 };
-const commit = git(["rev-parse", "--short", "HEAD"]);
-const dirty = git(["status", "--porcelain"]) !== "";
+const commit = commitSha.slice(0, 7);
+const dirty = false; // garanti : sources de l'application commitées (vérifié avant le build)
 const jdk = (spawnSync("java", ["-version"], { encoding: "utf8", shell: isWin, env: process.env }).stderr || "").split("\n")[0].trim();
 const expoSdk = JSON.parse(readFileSync(join(ROOT, "node_modules", "expo", "package.json"), "utf8")).version;
 const rn = JSON.parse(readFileSync(join(ROOT, "node_modules", "react-native", "package.json"), "utf8")).version;
