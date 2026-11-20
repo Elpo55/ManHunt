@@ -2,7 +2,7 @@
 
 Application mobile **Android et iOS** de chasse géolocalisée entre amis : les **Chasseurs** poursuivent les **Fugitifs** dans le monde réel, sur une vraie carte OpenStreetMap, à partir de la position GPS de chaque joueur — partagée **uniquement pendant une partie, avec consentement explicite**, et arrondie avant d'être montrée aux autres.
 
-> Nom affiché réglable avec `EXPO_PUBLIC_APP_NAME` (défaut : « Manhunt »). Version courante : **0.4.0** (build 400).
+> Nom affiché réglable avec `EXPO_PUBLIC_APP_NAME` (défaut : « Manhunt »). Version courante : **0.5.0** (build 500).
 
 ## Fonctionnalités
 
@@ -73,7 +73,7 @@ Voir [TESTING_GUIDE.md](TESTING_GUIDE.md), dont la procédure de test terrain av
 
 ## Versions et APK
 
-Version courante : **0.4.0** (build 400). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
+Version courante : **0.5.0** (build 500). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
 
 ## Historique
 

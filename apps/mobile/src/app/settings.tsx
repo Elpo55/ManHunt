@@ -155,6 +155,7 @@ export default function Settings() {
           <Button label="Gérer les autorisations" variant="secondary" icon="map-pin" onPress={() => router.push("/permissions")} />
         </Panel>
         <OfflinePanel />
+        <Button label="Confidentialité et données" variant="ghost" icon="shield" onPress={() => router.push("/privacy")} />
         {ROLE_RANK[role] >= ROLE_RANK.moderator ? (
           <Panel>
             <SectionTitle>Administration</SectionTitle>

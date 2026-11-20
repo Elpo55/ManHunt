@@ -213,6 +213,8 @@ export const api = {
   myStats: () => rpc<{ streak: number; best_streak: number; objectives: number; by_mode: Record<string, ModeStats> }>("get_my_stats"),
   replay: (game: string) => rpc<ReplayData>("get_replay", { p_game: game }),
   spectator: (game: string) => rpc<SpectatorView>("get_spectator_view", { p_game: game }),
+  /** Droit à l'effacement (RGPD) : supprime définitivement le compte et ses données. */
+  deleteMyAccount: () => rpc<void>("delete_my_account", { p_confirm: "SUPPRIMER" }),
 };
 
 /** Configurations sauvegardées (table protégée par RLS : propriétaire seulement). */

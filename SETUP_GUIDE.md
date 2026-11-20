@@ -38,6 +38,10 @@ Sans terminal : **SQL Editor → New query**, collez chaque fichier de `supabase
    - **Email** : laissez activé ; désactivez **Confirm email** pour un groupe d'amis (le service d'e-mail intégré n'envoie que quelques messages par heure, et le lien de confirmation n'ouvre pas l'application).
 2. **Authentication → Rate Limits** (facultatif) : augmentez « anonymous users » si beaucoup d'amis s'inscrivent depuis le même Wi-Fi.
 
+### 1.4 bis Envoi des e-mails (codes à 6 chiffres) — configuré en v0.5.0
+Le service d'e-mails intégré de Supabase n'envoie que 2 e-mails/h et seulement aux membres de l'organisation : un serveur SMTP est nécessaire.
+Configuration actuelle : compte Gmail dédié + mot de passe d'application (myaccount.google.com/apppasswords, validation en deux étapes requise), Supabase > Authentication > Emails > SMTP : `smtp.gmail.com`, port 465, expéditeur « Manhunt ». Codes : 6 chiffres, 15 min ; « Confirm email » activé ; modèles « Confirm signup », « Change email », « Reset password » en français contenant `{{ .Token }}`. Limite : 30 e-mails/h (Supabase), ~500/jour (Gmail).
+
 ### 1.5 Realtime
 **Realtime → Settings** (ou **Project Settings → Realtime**) : désactivez **Allow public access** → **Save**. Les canaux privés et leurs autorisations sont créés par les migrations.
 

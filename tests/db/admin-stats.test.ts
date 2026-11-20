@@ -75,3 +75,20 @@ describe("fiche joueur et RGPD", () => {
     await expect(db.as(p).query(`select * from public.account_notices`)).rejects.toThrow();
   });
 });
+
+describe("suppression de compte (RGPD)", () => {
+  it("confirmation exigée ; propriétaire et joueur en partie refusés ; salons transmis ; données effacées", async () => {
+    const { db, owner, p } = await setup();
+    const other = await db.createUser("Autre");
+    const { room_id, code } = await db.as(p).rpc<Json>("create_room", { p_name: "Salon de Joueur" });
+    await db.as(other).rpc("join_room", { p_code: code });
+    const solo = await db.as(p).rpc<Json>("create_room", { p_name: "Salon solo" });
+    await expectRpcError(db.as(p).rpc("delete_my_account", { p_confirm: "oui" }), "E_CONFIRMATION_REQUIRED");
+    await expectRpcError(db.as(owner).rpc("delete_my_account", { p_confirm: "SUPPRIMER" }), "E_OWNER_CANNOT_DELETE");
+    await db.as(p).rpc("delete_my_account", { p_confirm: "SUPPRIMER" });
+    expect(await db.sql(`select 1 from auth.users where id = $1`, [p.id])).toHaveLength(0);
+    expect(await db.sql(`select 1 from public.profiles where id = $1`, [p.id])).toHaveLength(0);
+    expect((await db.sql<Json>(`select host_id from public.rooms where id = $1`, [room_id]))[0].host_id).toBe(other.id);
+    expect(await db.sql(`select 1 from public.rooms where id = $1`, [solo.room_id])).toHaveLength(0);
+  });
+});

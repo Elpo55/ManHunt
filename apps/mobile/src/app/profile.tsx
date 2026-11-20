@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
 import { Guard } from "../components/Guard";
 import { ProfileForm } from "../components/ProfileForm";
+import { EmailCodeForm } from "../components/EmailCodeForm";
 import { ProgressPanels } from "../components/ProgressPanels";
 import { Button, Field, Input, Notice, Panel, Screen, SectionTitle, Stat, T, TeamTag } from "../components/ui";
+import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { getSupabase } from "../lib/supabase";
 import { colors, space } from "../theme";
@@ -22,7 +24,10 @@ interface Row {
 }
 
 export default function Profile() {
-  const { profile, session, linkEmail, signOut } = useAuth();
+  const { profile, session, linkEmail, signOut, verifyEmailCode, resendEmailCode, refreshProfile } = useAuth();
+  const [linkStep, setLinkStep] = useState<"form" | "code">("form");
+  const [confirmDelete, setConfirmDelete] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   const [history, setHistory] = useState<Row[] | null>(null);
   const [email, setEmail] = useState("");
@@ -90,23 +95,73 @@ export default function Profile() {
                   <Input value={password} onChangeText={setPassword} secureTextEntry />
                 </Field>
                 {msg ? <Notice tone={msg.tone}>{msg.text}</Notice> : null}
-                <Button
-                  label="Lier cet e-mail"
-                  variant="secondary"
-                  disabled={!email.includes("@") || password.length < 8}
-                  onPress={async () => {
-                    try {
-                      await linkEmail(email.trim(), password);
-                      setMsg({ tone: "info", text: "Confirmez l'adresse via le lien reçu par e-mail." });
-                    } catch (e) {
-                      setMsg({ tone: "error", text: toAppError(e).message });
-                    }
-                  }}
-                />
+                {linkStep === "code" ? (
+                  <EmailCodeForm
+                    email={email.trim()}
+                    onVerify={async (code) => {
+                      await verifyEmailCode(email.trim(), code, "email_change");
+                      await refreshProfile();
+                      setLinkStep("form");
+                      setMsg({ tone: "info", text: "Adresse confirmée : votre profil est conservé sur tous vos appareils." });
+                    }}
+                    onResend={() => resendEmailCode(email.trim(), "email_change")}
+                    submitLabel="Confirmer l'adresse"
+                  />
+                ) : (
+                  <Button
+                    label="Lier cet e-mail"
+                    variant="secondary"
+                    disabled={!email.includes("@") || password.length < 8}
+                    onPress={async () => {
+                      try {
+                        await linkEmail(email.trim(), password);
+                        setMsg(null);
+                        setLinkStep("code");
+                      } catch (e) {
+                        setMsg({ tone: "error", text: toAppError(e).message });
+                      }
+                    }}
+                  />
+                )}
               </Panel>
             ) : (
               <T v="small">Connecté avec {session?.user.email}</T>
             )}
+            <Panel>
+              <SectionTitle>Vie privée</SectionTitle>
+              <Button label="Confidentialité et données" small variant="secondary" icon="shield" onPress={() => router.push("/privacy")} />
+              <T v="small">Supprimer le compte efface définitivement votre profil, vos statistiques, vos succès et vos données de partie. Tapez SUPPRIMER pour confirmer.</T>
+              <Input value={confirmDelete} onChangeText={setConfirmDelete} autoCapitalize="characters" placeholder="SUPPRIMER" />
+              <Button
+                label="Supprimer mon compte"
+                small
+                variant="danger"
+                icon="trash-2"
+                loading={deleting}
+                disabled={confirmDelete !== "SUPPRIMER"}
+                onPress={() =>
+                  Alert.alert("Supprimer définitivement ?", "Cette action est irréversible.", [
+                    { text: "Annuler", style: "cancel" },
+                    {
+                      text: "Supprimer",
+                      style: "destructive",
+                      onPress: async () => {
+                        setDeleting(true);
+                        try {
+                          await api.deleteMyAccount();
+                          await signOut().catch(() => undefined);
+                          router.replace("/");
+                        } catch (e) {
+                          setMsg({ tone: "error", text: toAppError(e).message });
+                        } finally {
+                          setDeleting(false);
+                        }
+                      },
+                    },
+                  ])
+                }
+              />
+            </Panel>
             <Button
               label="Se déconnecter"
               variant="danger"

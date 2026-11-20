@@ -2,7 +2,7 @@
 
 Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] (à vérifier)` à contrôler · `[!]` bloqué (compte, paiement ou appareil requis).
 
-État au 20 novembre 2026 — **version 0.4.0 (build 400)**.
+État au 20 novembre 2026 — **version 0.5.0 (build 500)**.
 
 ---
 
@@ -20,7 +20,9 @@ Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] 
 **Jamais réalisé à ce jour** : installation sur un téléphone, test GPS réel, partie à plusieurs appareils, build iOS. Ces étapes exigent vos appareils.
 
 ## 0. Priorité : tester l'APK v0.4.0
-- [ ] Installer `releases/v0.4.0/Manhunt-v0.4.0.apk` (la v0.3.1 est mise à jour en conservant la session : même clé de débogage).
+- [ ] Installer `releases/v0.5.0/Manhunt-v0.5.0.apk` (met à jour la v0.4.0 en conservant la session : même clé de débogage).
+- [ ] Tester la création d'un compte e-mail (code reçu), « Mot de passe oublié », et Administration > Joueurs > fiche > « Corriger les statistiques ».
+- [x] Envoi des e-mails configuré (Gmail dédié, mot de passe d'application). Pour le révoquer : myaccount.google.com/apppasswords, puis me le dire.
 - [ ] Dérouler TESTING_GUIDE §1 bis puis la **checklist v0.4.0 (§1 ter, 22 points)** avec un second téléphone.
 - [ ] Ouvrir Réglages > Administration : vérifier le tableau de bord (vous êtes propriétaire).
 - [ ] M'envoyer les KO (modèle, version d'Android, capture d'écran si possible).

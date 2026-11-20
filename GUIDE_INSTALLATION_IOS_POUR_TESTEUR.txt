@@ -1,7 +1,7 @@
 ==========================================================================
  MANHUNT — INSTALLER L'APPLICATION SUR UN IPHONE DEPUIS UN MAC
  Guide pour débutant complet (aucune connaissance de macOS ni de
- développement iOS nécessaire). Version de l'application : 0.4.0
+ développement iOS nécessaire). Version de l'application : 0.5.0
 ==========================================================================
 
 POURQUOI CE GUIDE ?
@@ -457,7 +457,9 @@ Résultat attendu : vous arrivez sur l'écran « Localisation », puis sur
 Si « Serveur non configuré » s'affiche : le fichier .env était vide ou
   mal rempli au moment de la compilation → corrigez l'étape 16, refaites
   l'étape 20, puis 28.
-Vérifiez la version : Réglages (roue dentée) > en bas « Version 0.4.0 ».
+Vérifiez la version : Réglages (roue dentée) > en bas « Version 0.5.0 ».
+  Compte e-mail : à la création, un code à 6 chiffres arrive par e-mail
+  (regardez les spams) ; saisissez-le dans l'application.
 
 --------------------------------------------------------------------------
 ÉTAPE 31 — Autorisations GPS
@@ -494,7 +496,7 @@ Résultat attendu : la carte sombre s'affiche avec les rues et un cercle
 --------------------------------------------------------------------------
 Objectif : vérifier qu'un iPhone et un Android jouent ensemble.
 Instructions :
-  1. Sur l'Android (APK Manhunt 0.4.0 installé), créez un salon, choisissez
+  1. Sur l'Android (APK Manhunt 0.5.0 installé), créez un salon, choisissez
      une zone, touchez « Inviter des amis » ou notez le code à 6 caractères.
   2. Sur l'iPhone : accueil > « Rejoindre un salon » > tapez le code.
   3. Les deux : choisissez une équipe (un Chasseur, un Fugitif), cochez
@@ -594,7 +596,7 @@ Repartir de zéro en cas de blocage
   [ ] npx expo prebuild --platform ios --clean terminé
   [ ] Xcode : Personal Team choisie, aucune erreur rouge, configuration Release
   [ ] iPhone : « Se fier », Mode développeur activé, développeur approuvé
-  [ ] Manhunt s'ouvre, Réglages affiche « Version 0.4.0 »
+  [ ] Manhunt s'ouvre, Réglages affiche « Version 0.5.0 »
   [ ] Localisation « Toujours » + « Position exacte », notifications autorisées
   [ ] La carte s'affiche
   [ ] Partie de test réussie avec un téléphone Android

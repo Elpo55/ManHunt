@@ -86,6 +86,12 @@ const MESSAGES: Record<string, string> = {
   E_INVALID_MARKER: "Type de repère inconnu.",
   E_MARKER_OUTSIDE: "Repère trop loin de la zone de jeu.",
   E_GAME_NOT_FINISHED: "La partie n'est pas terminée.",
+  E_INVALID_STATS: "Valeurs invalides ou incohérentes (aucune modification).",
+  E_CONFIRMATION_REQUIRED: "Tapez SUPPRIMER pour confirmer.",
+  E_OWNER_CANNOT_DELETE: "Le propriétaire ne peut pas supprimer son compte (transférez d'abord le rôle).",
+  E_IN_GAME: "Quittez d'abord la partie en cours.",
+  E_EMAIL_NOT_CONFIRMED: "Adresse e-mail pas encore confirmée : saisissez le code reçu par e-mail.",
+  E_CODE_INVALID: "Code invalide ou expiré. Demandez un nouveau code.",
   E_REPLAY_EXPIRED: "Le replay n'est plus disponible : les trajets sont effacés 24 h après la partie.",
 };
 

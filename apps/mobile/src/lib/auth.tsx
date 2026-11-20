@@ -22,8 +22,15 @@ interface AuthCtx {
   signInEmail: (email: string, password: string) => Promise<void>;
   signUpEmail: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   linkEmail: (email: string, password: string) => Promise<void>;
+  /** Code à 6 chiffres reçu par e-mail (création de compte, ajout d'e-mail, mot de passe oublié). */
+  verifyEmailCode: (email: string, code: string, type: EmailCodeType) => Promise<void>;
+  resendEmailCode: (email: string, type: "signup" | "email_change") => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  setNewPassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
+
+export type EmailCodeType = "signup" | "email_change" | "recovery";
 
 const Ctx = createContext<AuthCtx | null>(null);
 
@@ -32,12 +39,17 @@ function authError(e: { message?: string } | null): AppError {
   const map: [RegExp, string][] = [
     [/Anonymous sign-ins are disabled/i, "Le mode invité est désactivé sur le serveur (Supabase > Authentication > Sign In / Providers)."],
     [/Invalid login credentials/i, "E-mail ou mot de passe incorrect."],
-    [/Email not confirmed/i, "Confirmez d'abord votre e-mail."],
+    [/Email not confirmed/i, "E_EMAIL_NOT_CONFIRMED"],
+    [/Token has expired or is invalid|otp_expired|invalid.*(otp|token)/i, "E_CODE_INVALID"],
+    [/For security purposes, you can only request this after/i, "Patientez une minute avant de redemander un code."],
+    [/New password should be different/i, "Le nouveau mot de passe doit être différent de l'ancien."],
+    [/Unable to validate email address|invalid format/i, "Adresse e-mail invalide."],
     [/already registered/i, "Un compte existe déjà avec cet e-mail."],
     [/rate limit/i, "Trop de tentatives. Réessayez dans quelques minutes."],
     [/Password should be/i, "Mot de passe trop court (8 caractères minimum)."],
   ];
   for (const [re, text] of map) if (re.test(m)) {
+    if (/^E_[A-Z_]+$/.test(text)) return new AppError(text);
     const err = new AppError("E_AUTH");
     err.message = text;
     return err;
@@ -139,7 +151,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { needsConfirmation: !data.session };
       },
       linkEmail: async (email, password) => {
+        // Mot de passe enregistré tout de suite ; l'e-mail n'est lié qu'après saisie du code reçu.
         const { error } = await sb().auth.updateUser({ email, password });
+        if (error) throw authError(error);
+      },
+      verifyEmailCode: async (email, code, type) => {
+        const { error } = await sb().auth.verifyOtp({ email, token: code, type });
+        if (error) throw authError(error);
+        await loadProfile((await sb().auth.getUser()).data.user?.id);
+      },
+      resendEmailCode: async (email, type) => {
+        const { error } = await sb().auth.resend({ email, type });
+        if (error) throw authError(error);
+      },
+      requestPasswordReset: async (email) => {
+        const { error } = await sb().auth.resetPasswordForEmail(email);
+        if (error) throw authError(error);
+      },
+      setNewPassword: async (password) => {
+        const { error } = await sb().auth.updateUser({ password });
         if (error) throw authError(error);
       },
       signOut: async () => {

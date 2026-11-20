@@ -14,7 +14,7 @@
 
 ```bash
 npm install
-npm test                 # 103 tests
+npm test                 # 107 tests
 npm run test:unit        # géographie, configuration, état, couches carte, contrôleur, séquenceur, horloge
 npm run test:db          # salons, moteur GPS, sécurité, parité TS/SQL, cron, simulation
 npm run typecheck        # racine + shared + mobile
@@ -70,6 +70,10 @@ Notez pour chaque point : OK / KO + modèle du téléphone + version d'Android.
 | 20 | Succès / stats | Profil | Succès débloqués, statistiques par mode |
 | 21 | Administration | Réglages > Administration (compte propriétaire) | Vue générale, joueurs, parties, signalements, réglages, journal |
 | 22 | Signalement | Lobby > toucher un joueur > Signaler | Visible dans Administration > Signalements |
+| 23 | Code e-mail (v0.5.0) | Créer un compte e-mail | Code à 6 chiffres reçu ; compte actif après saisie ; mauvais code refusé |
+| 24 | Mot de passe oublié | Connexion > Mot de passe oublié | Code reçu, nouveau mot de passe accepté |
+| 25 | Correction de stats | Administration > Joueurs > fiche > Corriger | Valeurs modifiées, historique, avis visible dans le profil du joueur |
+| 26 | Suppression de compte | Profil > Vie privée > SUPPRIMER | Compte effacé, retour à l'accueil |
 
 Notez OK / KO, le modèle et la version d'Android/iOS. iOS : suivez d'abord `GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt`.
 
