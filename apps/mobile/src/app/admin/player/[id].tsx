@@ -3,6 +3,7 @@ import { MODE_LABEL, formatDuration, toAppError } from "@traque/shared";
 import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { View } from "react-native";
+import { AchievementsEditor, CorrectionsHistory, PersonalDataPanel, StatsEditor } from "../../../components/admin/PlayerAdminPanels";
 import { useReason } from "../../../components/admin/ReasonModal";
 import { Guard } from "../../../components/Guard";
 import { Button, Loading, Notice, Panel, Screen, SectionTitle, Segmented, Stat, T, useToast } from "../../../components/ui";
@@ -72,6 +73,11 @@ export default function AdminPlayer() {
           </View>
           <T v="small">{`Signalements le concernant : ${d.reports_against} (dont ${d.reports_open} ouverts)`}</T>
         </Panel>
+
+        <PersonalDataPanel profile={p} myRole={myRole} />
+        {myRole === "owner" ? <StatsEditor key={JSON.stringify(p)} profile={p} onSaved={load} /> : null}
+        {myRole === "owner" ? <AchievementsEditor userId={p.id} achievements={d.achievements ?? []} onSaved={load} /> : null}
+        <CorrectionsHistory corrections={d.corrections ?? []} />
 
         {canSanction ? (
           <Panel>

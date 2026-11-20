@@ -203,7 +203,7 @@ export const api = {
   // v0.4.0
   myRole: () => rpc<Role>("get_my_role"),
   myNotices: () =>
-    rpc<{ id: string; kind: "warning" | "suspension"; reason: string; starts_at: number; ends_at: number | null; revoked: boolean }[]>("get_my_notices"),
+    rpc<{ id: string; kind: "warning" | "suspension" | "correction"; reason: string; starts_at: number; ends_at: number | null; revoked: boolean }[]>("get_my_notices"),
   appSettings: () => rpc<AppSettings>("get_app_settings"),
   latestRelease: (platform: "android" | "ios") => rpc<Release | null>("get_latest_release", { p_platform: platform }),
   logError: (code: string, context: string, version: string) => rpc<void>("log_client_error", { p_code: code, p_context: context, p_app_version: version }),
@@ -267,6 +267,12 @@ export const adminApi = {
       p_platform: platform, p_version: version, p_severity: severity, p_url: url, p_notes: notes, p_min_supported_build: minBuild,
     }),
   audit: (limit = 100) => rpc<AdminJson[]>("admin_audit_log", { p_limit: limit }),
+  // v0.5.0 — propriétaire : corrections ; administrateur : e-mail complet (journalisé)
+  correctStats: (u: string, changes: Record<string, number>, reason: string) =>
+    rpc<{ before: Record<string, number>; after: Record<string, number> }>("admin_correct_stats", { p_user: u, p_changes: changes, p_reason: reason }),
+  setAchievement: (u: string, key: string, unlocked: boolean, reason: string) =>
+    rpc("admin_set_achievement", { p_user: u, p_key: key, p_unlocked: unlocked, p_reason: reason }),
+  revealEmail: (u: string, reason: string) => rpc<string>("admin_reveal_email", { p_user: u, p_reason: reason }),
 };
 
 /** Implémentation de l'API attendue par le contrôleur de partie partagé. */

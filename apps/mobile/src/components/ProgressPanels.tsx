@@ -32,10 +32,12 @@ export function ProgressPanels() {
   return (
     <>
       {activeNotices.map((n) => (
-        <Notice key={n.id} tone={n.kind === "suspension" ? "error" : "warn"} icon="alert-triangle">
+        <Notice key={n.id} tone={n.kind === "suspension" ? "error" : n.kind === "correction" ? "info" : "warn"} icon={n.kind === "correction" ? "edit-3" : "alert-triangle"}>
           {n.kind === "suspension"
             ? `Compte suspendu jusqu'au ${new Date(n.ends_at ?? 0).toLocaleString("fr-FR")} : ${n.reason}`
-            : `Avertissement de la modération : ${n.reason}`}
+            : n.kind === "correction"
+              ? `${n.reason} (${new Date(n.starts_at).toLocaleDateString("fr-FR")})`
+              : `Avertissement de la modération : ${n.reason}`}
         </Notice>
       ))}
 
