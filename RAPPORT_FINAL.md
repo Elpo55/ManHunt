@@ -1,4 +1,39 @@
-# Rapport — v0.3.1 « Projet Traque » (stabilisation + premier APK)
+# Rapport — v0.4.0 « Manhunt »
+
+Date : 20 novembre 2026. Version **0.4.0**, build Android **400**. APK : `releases/v0.4.0/Manhunt-v0.4.0.apk` (76,1 Mo, SHA-256 `22021f8f…2e3155`). Guide iPhone : `GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt`.
+
+## Terminé (serveur + application, testé automatiquement)
+- **Administration** : rôles propriétaire/admin/modérateur (vérifiés serveur), tableau de bord (activité, backend, pg_cron, temps réel, erreurs, quotas), joueurs (recherche, fiche, avertissement, suspension, levée), parties/salons (participants, équipes, paramètres sans coordonnées, pause/reprise/fin non comptée, fermeture), signalements (notes, clôture), paramètres globaux (limites appliquées, valeurs par défaut, fonctionnalités, proximité, annonce, versions), journal d'audit. Aucune capacité de triche (testé).
+- **Distribution** : alerte de nouvelle version (facultative/recommandée/importante, notes, lien, build minimal), version réellement installée affichée.
+- **Notifications locales** en arrière-plan (6 catégories, anti-répétition), alertes de proximité.
+- **Modes Royale et Mister X**, **capture QR** (+ code manuel), **objectifs** (balises, extraction, victoire), **zones polygonales et interdites**, **spectateurs** (positions différées, canal d'équipe retiré), **GPS muet**, **heure de fin et rendez-vous**, **SOS**.
+- **Messages rapides**, **repères**, **batterie/état des coéquipiers**.
+- **Configurations sauvegardées**, **cartes hors ligne**, **replay 24 h**, **succès** (13), **statistiques par mode**.
+
+## Partiellement réalisé
+- **EAS Update** : intégré et configurable (canal, runtimeVersion = version), mais **inactif** tant que le projet n'est pas relié à expo.dev (compte Expo requis).
+- **Zones interdites** : cercles dans l'interface ; polygones acceptés et validés par le serveur mais non dessinables dans l'éditeur. Exclusion automatique des routes / plans d'eau : non réalisée (données cartographiques non exploitées) — l'hôte dessine les zones.
+- **Distribution de l'APK** : l'alerte fonctionne, mais aucun lien d'hébergement n'est publié (à choisir par vous).
+
+## Non réalisé
+- **Mode entraînement solo avec bots** (P3) : non développé. Architecture prévue : bots comme comptes dédiés marqués `is_bot`, exclus des statistiques et classements, mus par une fonction serveur de simulation (cf. `tests/db/simulation.test.ts`, qui fait déjà marcher 20 joueurs simulés) ; restent : comptes bots, RPC de lancement d'entraînement, déplacement planifié (pg_cron ou tick), filtrage des statistiques, écran.
+- **Nouvelles capacités** : aucune ajoutée volontairement — l'équilibrage des 6 capacités existantes doit d'abord être validé sur le terrain.
+
+## Bugs corrigés
+Pause (Leurre et délai hors zone), normalisation serveur (points sans longitude acceptés), autorisation Push iOS bloquant un compte Apple gratuit (et ordre du plugin), spectateur resté abonné au canal d'équipe, R8 à court de mémoire au build.
+
+## Tests
+103 automatisés réussis (30 unitaires, 73 PostgreSQL réel dont 15 v0.4.0), typage, lint (0 erreur, 0 avertissement), expo-doctor 20/20, bundle iOS, introspection de la configuration iOS (Info.plist, droits), APK contrôlé (aapt, apksigner, bundle, secrets). **Non réalisés** : installation et usage sur téléphone, multijoueur réel, iOS natif (Xcode), notifications écran éteint, cartes hors ligne sur appareil.
+
+## iOS — état réel
+Code et configuration compatibles (vérifiés par introspection) ; compilation Xcode **jamais faite** (impossible sous Windows) ; guide débutant complet fourni.
+
+## Signature
+APK signé avec la clé de **débogage** publique : installable pour tester, mise à jour possible depuis la v0.3.x, non publiable. Clé personnelle : DEPLOYMENT_GUIDE §0.
+
+---
+
+# Rapport — v0.3.1 (historique) « Projet Traque » (stabilisation + premier APK)
 
 Date : 19 novembre 2026. Version **0.3.1**, build Android **301**. APK : `releases/v0.3.1/application-v0.3.1.apk`.
 
