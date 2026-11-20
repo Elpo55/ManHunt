@@ -29,7 +29,7 @@ releases/v0.3.0/
   BUILD_REPORT.md          (version, build, SHA-256, signature, permissions, vérifications)
 ```
 
-Il refuse d'écraser un APK déjà livré : augmentez d'abord la version, et refuse aussi de compiler si le code de l'application n'est pas commité (l'APK correspond toujours à un commit). Prérequis : Android Studio (JDK intégré, `JAVA_HOME`), SDK Android (`ANDROID_HOME`) ; le NDK est téléchargé automatiquement au premier build.
+Depuis la v0.4.0 le fichier s'appelle `Manhunt-vX.Y.Z.apk`. Il refuse d'écraser un APK déjà livré : augmentez d'abord la version, et refuse aussi de compiler si le code de l'application n'est pas commité (l'APK correspond toujours à un commit). Prérequis : Android Studio (JDK intégré, `JAVA_HOME`), SDK Android (`ANDROID_HOME`) ; le NDK est téléchargé automatiquement au premier build.
 
 Sous Windows, la compilation C++ dépasse la limite de 260 caractères :
 - le script compile dans une copie Git du commit à un chemin court, `C:/tqb` (modifiable : `TRAQUE_BUILD_DIR`), conservée entre deux builds (~7 min ensuite) ;
@@ -108,7 +108,32 @@ iOS (compte Apple payant) : enregistrez chaque iPhone (`npx eas-cli device:creat
 
 Une **politique de confidentialité** publique est exigée par les deux stores : elle peut reprendre docs/SECURITY.md (sections « Données de localisation » et « Rétention »).
 
-## 6. iOS depuis macOS (non réalisable sur ce PC Windows)
+## 6. Mises à jour sans réinstaller (EAS Update) — préparé, inactif par défaut
+
+`expo-updates` est intégré depuis la v0.4.0, mais **désactivé** tant que le projet n'est pas relié à expo.dev (les APK actuels n'interrogent aucun serveur de mises à jour).
+
+Activation (compte Expo gratuit requis) :
+1. `cd apps/mobile && npx eas-cli@latest login && npx eas-cli init` → noter l'identifiant de projet ; le mettre dans `EAS_PROJECT_ID` (fichier `.env` et variables EAS).
+2. Recompiler un APK (`npm run release:apk`) : seuls les binaires compilés avec `EAS_PROJECT_ID` reçoivent des mises à jour.
+3. Publier un correctif JavaScript : `npx eas-cli update --channel production --message "…"`. Les APK locaux interrogent le canal `production` (modifiable avec la variable `EAS_UPDATE_CHANNEL` au moment du build, cf. `app.config.ts`).
+4. Retour arrière : `npx eas-cli update:rollback` (ou republier une mise à jour précédente avec `eas update:republish`).
+
+Garanties et limites :
+- `runtimeVersion` = version de l'application : une mise à jour JavaScript n'est **jamais** appliquée à un binaire d'une autre version ; toute modification native (permissions, nouveau module, `app.config.ts`) exige un nouvel APK et une nouvelle version.
+- Téléchargement au lancement ; en cas d'échec, l'application démarre avec le code déjà installé ; Réglages > Version indique le code réellement exécuté.
+- Offre gratuite Expo : nombre limité d'utilisateurs actifs par mois pour EAS Update (voir la page tarifs d'expo.dev) — largement suffisant pour un groupe d'amis.
+
+## 7. Distribuer l'APK et prévenir les joueurs (sans store)
+
+1. `npm run release:apk` produit `releases/vX.Y.Z/Manhunt-vX.Y.Z.apk`.
+2. Héberger le fichier à une adresse **https** que vos amis peuvent ouvrir (par exemple un lien de partage Google Drive, ou un bucket public Supabase Storage). Attention : un lien public permet à quiconque l'obtient d'installer l'application.
+3. Dans l'application (compte administrateur) : Réglages > Administration > Réglages > « Publier une version » (version, gravité, lien, nouveautés). Les téléphones dont le build est inférieur affichent un bandeau sur l'accueil ; « Importante » ou un « build minimal » rend l'alerte non masquable.
+
+## 8. iOS depuis macOS (non réalisable sur ce PC Windows)
+
+Guide pas à pas pour un débutant, d'un Mac neuf jusqu'à l'application installée : **[GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt](GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt)** (compte Apple gratuit, « Personal Team », configuration Release, limites des 7 jours).
+
+Préparé et vérifié depuis Windows (introspection de la configuration Expo) : textes d'autorisation (localisation, arrière-plan, caméra), modes d'arrière-plan `location`, **aucune autorisation Push** (retirée par `plugins/withoutPushEntitlement.js`, indispensable avec un compte gratuit), identifiant `APP_BUNDLE_ID`, numéro de build. Non vérifié : compilation Xcode et exécution sur iPhone.
 
 Le code est commun ; ce qui diffère : invites de localisation (« Lorsque l'app est active » puis « Toujours » proposé plus tard par iOS), indicateur bleu de localisation en arrière-plan, mises à jour GPS parfois espacées en arrière-plan, pas de bouton retour matériel (le geste retour est désactivé sur l'écran de jeu).
 

@@ -123,7 +123,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // jamais appliquée à un binaire d'une autre version (changements natifs = nouvel APK).
   runtimeVersion: { policy: "appVersion" },
   updates: EAS_PROJECT_ID
-    ? { enabled: true, url: `https://u.expo.dev/${EAS_PROJECT_ID}`, checkAutomatically: "ON_LOAD", fallbackToCacheTimeout: 0 }
+    ? {
+        enabled: true,
+        url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+        checkAutomatically: "ON_LOAD",
+        fallbackToCacheTimeout: 0,
+        // Canal interrogé par les APK compilés localement (npm run release:apk).
+        requestHeaders: { "expo-channel-name": process.env.EAS_UPDATE_CHANNEL?.trim() || "production" },
+      }
     : { enabled: false },
   experiments: { typedRoutes: false },
   extra: {

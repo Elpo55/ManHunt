@@ -138,6 +138,14 @@ const props = (p) => p.replaceAll("\\", "/");
 const localProps = [`sdk.dir=${props(sdk)}`, cmakeVer ? `cmake.dir=${props(join(cmakeRoot, cmakeVer))}` : null].filter(Boolean);
 writeFileSync(join(android, "local.properties"), localProps.join("\n") + "\n");
 
+// Mémoire de Gradle/R8 : le modèle Expo (2 Go, Metaspace 512 Mo) ne suffit plus depuis
+// la v0.4.0 (R8 échouait en « OutOfMemoryError: Metaspace »).
+const gradleProps = join(android, "gradle.properties");
+writeFileSync(
+  gradleProps,
+  readFileSync(gradleProps, "utf8").replace(/^org\.gradle\.jvmargs=.*$/m, "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1536m"),
+);
+
 const gradleFile = join(android, "app", "build.gradle");
 const ks = process.env.TRAQUE_KEYSTORE;
 let signing = "debug";

@@ -1,0 +1,604 @@
+==========================================================================
+ MANHUNT — INSTALLER L'APPLICATION SUR UN IPHONE DEPUIS UN MAC
+ Guide pour débutant complet (aucune connaissance de macOS ni de
+ développement iOS nécessaire). Version de l'application : 0.4.0
+==========================================================================
+
+POURQUOI CE GUIDE ?
+  Manhunt n'est pas sur l'App Store. Pour l'installer sur un iPhone, il
+  faut le compiler soi-même avec Xcode (l'outil gratuit d'Apple), sur un
+  Mac, et le signer avec un identifiant Apple GRATUIT. Comptez 1 h 30 à
+  2 h la première fois (dont beaucoup de téléchargements), 5 minutes les
+  fois suivantes.
+
+CE DONT VOUS AVEZ BESOIN
+  - Un Mac (récent de préférence, avec au moins 40 Go d'espace libre :
+    Xcode est très volumineux).
+  - Un iPhone et son câble USB (USB-C ou Lightning selon le modèle).
+  - Un identifiant Apple (celui de l'App Store suffit, gratuit).
+  - Une connexion Internet.
+  - Un compte GitHub (gratuit) et l'invitation de la personne qui gère
+    Manhunt au dépôt privé (voir étape 14).
+  - Deux informations que la personne qui gère Manhunt vous enverra en
+    privé (message, e-mail) : l'adresse du serveur et la « clé publique »
+    du serveur (voir étape 16).
+
+CONVENTIONS DE CE GUIDE
+  - « Tapez dans le Terminal » : copiez la ligne indiquée (sans les
+    espaces du début), collez-la dans la fenêtre Terminal (Cmd + V), puis
+    appuyez sur Entrée.
+  - Les lignes qui commencent par  $  sont des commandes. Ne tapez PAS le
+    signe $ lui-même.
+  - Cmd = touche ⌘ (Command), à côté de la barre d'espace.
+  - Si une commande demande votre MOT DE PASSE DU MAC : tapez-le (rien ne
+    s'affiche pendant la frappe, c'est normal) puis Entrée.
+
+==========================================================================
+ PARTIE A — PRÉPARER LE MAC
+==========================================================================
+
+--------------------------------------------------------------------------
+ÉTAPE 1 — Préparation initiale du Mac
+--------------------------------------------------------------------------
+Objectif : partir d'un Mac à jour et avec assez d'espace.
+Instructions :
+  1. Branchez le Mac sur secteur (les installations sont longues).
+  2. Menu Pomme  (en haut à gauche) > « Réglages Système » > « Général »
+     > « Stockage » : vérifiez qu'il reste au moins 40 Go libres.
+  3. Connectez-vous avec votre identifiant Apple si ce n'est pas fait :
+     Réglages Système > (votre nom ou « Se connecter ») en haut à gauche.
+Résultat attendu : Mac branché, 40 Go libres, identifiant Apple connecté.
+Erreur fréquente : manque d'espace → supprimez de gros fichiers ou
+  téléchargements avant de continuer (Xcode échoue sinon en cours de
+  route).
+
+--------------------------------------------------------------------------
+ÉTAPE 2 — Vérifier la version de macOS
+--------------------------------------------------------------------------
+Objectif : connaître votre version de macOS pour savoir quel Xcode est
+installable.
+Instructions : Menu Pomme  > « À propos de ce Mac ». Notez le nom et le
+  numéro (par exemple « macOS Tahoe 26.1 » ou « macOS Sequoia 15.x »).
+Résultat attendu : vous connaissez votre version de macOS.
+Si une mise à jour de macOS est proposée (Réglages Système > Général >
+  Mise à jour de logiciels), installez-la AVANT Xcode.
+
+--------------------------------------------------------------------------
+ÉTAPE 3 — Vérifier la compatibilité avec Xcode
+--------------------------------------------------------------------------
+Objectif : s'assurer que votre Mac peut installer une version d'Xcode
+assez récente. Manhunt utilise Expo SDK 58 / React Native 0.88, qui
+exigent un Xcode récent (Xcode 26 ou plus récent).
+Instructions :
+  1. Ouvrez l'App Store (icône bleue « A » dans le Dock ou via Spotlight :
+     Cmd + Espace, tapez « App Store », Entrée).
+  2. Cherchez « Xcode ». Sur la page d'Xcode, descendez jusqu'à
+     « Compatibilité » / « Informations » : la version de macOS requise y
+     est indiquée.
+Résultat attendu : votre macOS (étape 2) est égal ou supérieur à celui
+  demandé.
+Si votre Mac est trop ancien pour la dernière version d'Xcode : il ne
+  pourra pas compiler Manhunt. Il faut un Mac plus récent (ou que la
+  personne qui gère Manhunt utilise un compte Apple Developer payant et
+  le service de compilation en ligne EAS — voir DEPLOYMENT_GUIDE.md).
+
+--------------------------------------------------------------------------
+ÉTAPE 4 — Installer Xcode depuis le Mac App Store
+--------------------------------------------------------------------------
+Objectif : installer l'outil d'Apple qui compile les applications iPhone.
+Instructions : dans l'App Store, page « Xcode », cliquez « Obtenir » puis
+  « Installer ». Entrez votre mot de passe Apple si demandé.
+Résultat attendu : Xcode apparaît dans le dossier Applications.
+Durée : 30 min à 2 h (plus de 10 Go).
+Erreurs fréquentes :
+  - « Espace insuffisant » : libérez de l'espace (étape 1).
+  - Téléchargement bloqué : redémarrez le Mac et relancez depuis l'onglet
+    « Mises à jour » / « Achats » de l'App Store.
+
+--------------------------------------------------------------------------
+ÉTAPE 5 — Premier lancement d'Xcode et installation des composants
+--------------------------------------------------------------------------
+Objectif : laisser Xcode installer ses composants et la plateforme iOS.
+Instructions :
+  1. Ouvrez Xcode (Applications > Xcode).
+  2. Une fenêtre propose de choisir les plateformes : cochez « iOS »
+     (macOS est toujours inclus), puis « Download & Install ».
+  3. Attendez la fin (barre de progression), puis fermez Xcode.
+Résultat attendu : Xcode s'ouvre sur l'écran « Welcome to Xcode » sans
+  nouvelle demande d'installation.
+Erreur fréquente : vous avez fermé la fenêtre trop tôt → rouvrez Xcode,
+  menu Xcode > Settings… > « Components » (ou « Platforms ») et
+  installez « iOS ».
+
+--------------------------------------------------------------------------
+ÉTAPE 6 — Accepter les licences
+--------------------------------------------------------------------------
+Objectif : accepter la licence d'Xcode (sinon les outils refusent de
+fonctionner).
+Instructions :
+  1. Ouvrez le Terminal : Cmd + Espace, tapez « Terminal », Entrée.
+     (Voir aussi l'étape 13.)
+  2. Tapez dans le Terminal :
+       $ sudo xcodebuild -license accept
+     puis votre mot de passe du Mac.
+Résultat attendu : la commande se termine sans message d'erreur.
+Erreur fréquente : « xcode-select: error: tool 'xcodebuild' requires
+  Xcode » → faites l'étape 7 puis recommencez.
+
+--------------------------------------------------------------------------
+ÉTAPE 7 — Installer les outils en ligne de commande
+--------------------------------------------------------------------------
+Objectif : outils de compilation utilisés par le Terminal (ils
+contiennent aussi Git).
+Instructions : tapez dans le Terminal :
+       $ xcode-select --install
+  Une fenêtre s'ouvre : cliquez « Installer », acceptez, attendez.
+  Puis indiquez au Mac d'utiliser votre Xcode :
+       $ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+Résultat attendu : la commande
+       $ xcode-select -p
+  affiche  /Applications/Xcode.app/Contents/Developer
+Erreur fréquente : « command line tools are already installed » → c'est
+  parfait, passez à la suite.
+
+--------------------------------------------------------------------------
+ÉTAPE 8 — Git
+--------------------------------------------------------------------------
+Objectif : Git sert à télécharger le code de Manhunt. Il est déjà inclus
+dans les outils de l'étape 7 : rien à installer.
+Vérification : tapez dans le Terminal :
+       $ git --version
+Résultat attendu : « git version 2.x.x ».
+
+--------------------------------------------------------------------------
+ÉTAPE 9 — Installer Homebrew (nécessaire ici)
+--------------------------------------------------------------------------
+Objectif : Homebrew est un installateur d'outils. Il est nécessaire pour
+installer CocoaPods (étape 11) et l'outil GitHub (étape 14) proprement.
+Instructions : tapez dans le Terminal (une seule ligne) :
+       $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  Appuyez sur Entrée quand il le demande, puis tapez votre mot de passe.
+  À LA FIN, Homebrew affiche « Next steps » avec deux ou trois commandes
+  commençant par « echo » et « eval » : copiez-les et exécutez-les
+  exactement comme indiqué (elles ajoutent brew au Terminal).
+  Fermez puis rouvrez le Terminal.
+Résultat attendu :
+       $ brew --version
+  affiche « Homebrew 4.x » (ou plus récent).
+Erreur fréquente : « brew: command not found » → vous n'avez pas exécuté
+  les commandes « Next steps ». Sur un Mac Apple (M1, M2, M3…), tapez :
+       $ echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+       $ eval "$(/opt/homebrew/bin/brew shellenv)"
+
+--------------------------------------------------------------------------
+ÉTAPE 10 — Installer Node.js et npm
+--------------------------------------------------------------------------
+Objectif : Node.js fait fonctionner les outils de Manhunt (Expo). npm est
+fourni avec Node.js.
+Instructions : tapez dans le Terminal :
+       $ brew install node@22
+       $ brew link --overwrite node@22
+Résultat attendu :
+       $ node --version      → v22.x.x (ou plus récent)
+       $ npm --version       → 10.x.x (ou plus récent)
+Erreur fréquente : « node: command not found » après l'installation →
+  fermez et rouvrez le Terminal. Si cela persiste :
+       $ echo 'export PATH="/opt/homebrew/opt/node@22/bin:$PATH"' >> ~/.zprofile
+  puis rouvrez le Terminal.
+
+--------------------------------------------------------------------------
+ÉTAPE 11 — Installer CocoaPods
+--------------------------------------------------------------------------
+Objectif : CocoaPods récupère les bibliothèques natives iOS de Manhunt
+(carte MapLibre, caméra, localisation…).
+Instructions :
+       $ brew install cocoapods
+Résultat attendu :
+       $ pod --version       → 1.16.x (ou plus récent)
+
+--------------------------------------------------------------------------
+ÉTAPE 12 — Autres outils
+--------------------------------------------------------------------------
+Rien d'autre à installer. (Watchman, Ruby, Android Studio, compte Expo ou
+compte Apple payant ne sont PAS nécessaires pour ce guide.)
+
+==========================================================================
+ PARTIE B — RÉCUPÉRER ET CONFIGURER MANHUNT
+==========================================================================
+
+--------------------------------------------------------------------------
+ÉTAPE 13 — Ouvrir le Terminal
+--------------------------------------------------------------------------
+Objectif : la fenêtre où l'on tape les commandes.
+Instructions : Cmd + Espace, tapez « Terminal », Entrée. Pour le garder
+  sous la main : clic droit sur son icône dans le Dock > Options >
+  « Garder dans le Dock ».
+Astuce : pour revenir dans votre dossier personnel à tout moment :
+       $ cd ~
+
+--------------------------------------------------------------------------
+ÉTAPE 14 — Cloner (télécharger) le dépôt GitHub
+--------------------------------------------------------------------------
+Objectif : copier le code de Manhunt sur le Mac. Le dépôt est PRIVÉ :
+  1. Créez un compte sur https://github.com (gratuit) si besoin, et
+     communiquez votre nom d'utilisateur GitHub à la personne qui gère
+     Manhunt.
+  2. Elle vous invite (GitHub > dépôt ManHunt > Settings > Collaborators
+     > Add people). Acceptez l'invitation reçue par e-mail.
+Instructions : installez l'outil GitHub et connectez-vous :
+       $ brew install gh
+       $ gh auth login
+  Répondez : GitHub.com > HTTPS > Yes > Login with a web browser.
+  Copiez le code affiché, appuyez sur Entrée, collez le code dans la page
+  qui s'ouvre et validez.
+  Puis téléchargez le projet dans votre dossier personnel :
+       $ cd ~
+       $ gh repo clone Elpo55/ManHunt
+       $ cd ManHunt
+Résultat attendu : la commande
+       $ ls
+  affiche notamment : apps  packages  supabase  README.md
+  GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt
+Erreurs fréquentes :
+  - « Could not resolve to a Repository » → l'invitation n'est pas
+    acceptée, ou vous êtes connecté avec un autre compte (gh auth status).
+  - « destination path 'ManHunt' already exists » → le projet est déjà
+    là : faites  cd ~/ManHunt  puis  git pull  pour le mettre à jour.
+
+--------------------------------------------------------------------------
+ÉTAPE 15 — Installer les dépendances du projet
+--------------------------------------------------------------------------
+Objectif : télécharger les bibliothèques JavaScript de Manhunt.
+Instructions (dans le dossier ManHunt) :
+       $ cd ~/ManHunt
+       $ npm install
+Résultat attendu : se termine par « added … packages » (des
+  avertissements « npm warn » sont normaux). Durée : 2 à 10 min.
+Erreur fréquente : « EBADENGINE » ou erreur de version → vérifiez
+  node --version (étape 10, Node 22 ou plus récent).
+
+--------------------------------------------------------------------------
+ÉTAPE 16 — Configurer les variables d'environnement
+--------------------------------------------------------------------------
+Objectif : indiquer à l'application quel serveur utiliser et quel
+identifiant d'application prendre. Ces informations sont mises dans un
+fichier « .env » qui reste sur votre Mac (il n'est jamais envoyé sur
+GitHub).
+Instructions :
+  1. Copiez le modèle :
+       $ cd ~/ManHunt/apps/mobile
+       $ cp .env.example .env
+  2. Ouvrez-le dans l'éditeur de texte :
+       $ open -e .env
+  3. Modifiez ces lignes (les autres restent telles quelles) :
+       EXPO_PUBLIC_SUPABASE_URL=   ← l'adresse du serveur envoyée par la
+                                     personne qui gère Manhunt (elle
+                                     commence par https:// et finit par
+                                     .supabase.co)
+       EXPO_PUBLIC_SUPABASE_ANON_KEY=  ← la « clé publique » envoyée
+                                     (une longue suite de caractères
+                                     commençant par eyJ… ou sb_publishable_…)
+       APP_BUNDLE_ID=              ← votre identifiant d'application
+                                     (voir étape 19), par exemple :
+                                     com.prenomnom.manhunt
+       EXPO_PUBLIC_APP_NAME=Manhunt
+     Pas d'espace autour du signe « = », pas de guillemets.
+  4. Enregistrez (Cmd + S) et fermez l'éditeur.
+Résultat attendu :
+       $ cat .env
+  affiche vos lignes avec les valeurs remplies.
+Important : ne partagez jamais d'autre clé que la « clé publique ». Si on
+  vous envoie une clé appelée « service_role » ou « secret », ne l'utilisez
+  pas et prévenez la personne qui gère Manhunt.
+
+--------------------------------------------------------------------------
+ÉTAPE 17 — Configuration Supabase (serveur)
+--------------------------------------------------------------------------
+Objectif : le serveur de jeu est déjà configuré par la personne qui gère
+Manhunt. Vous n'avez RIEN à faire côté Supabase : les deux valeurs de
+l'étape 16 suffisent.
+Vérification (facultative) : la commande
+       $ curl -s -o /dev/null -w "%{http_code}\n" "$(grep SUPABASE_URL .env | cut -d= -f2-)/auth/v1/health"
+  affiche 401 ou 200 (le serveur répond). « 000 » = adresse erronée ou
+  pas d'Internet.
+
+--------------------------------------------------------------------------
+ÉTAPE 18 — Configuration de la carte (MapLibre)
+--------------------------------------------------------------------------
+Objectif : la carte utilise par défaut OpenFreeMap (données
+OpenStreetMap), gratuit et SANS clé. Rien à configurer : laissez
+EXPO_PUBLIC_MAP_PROVIDER=openfreemap dans le fichier .env.
+
+--------------------------------------------------------------------------
+ÉTAPE 19 — Le « Bundle Identifier » (identifiant d'application)
+--------------------------------------------------------------------------
+Objectif : chaque application iPhone a un identifiant unique au monde.
+Avec un compte Apple gratuit, il doit être propre à VOUS.
+Règle : com.<vos-initiales-ou-prénomnom>.manhunt, en minuscules, sans
+  accent, sans espace, sans tiret. Exemple : com.julienmartin.manhunt
+Instructions : c'est la valeur APP_BUNDLE_ID de l'étape 16. Si vous la
+  changez plus tard, refaites l'étape 20.
+Erreur fréquente (étape 28) : « Failed to register bundle identifier » →
+  cet identifiant est déjà pris : choisissez-en un autre (ajoutez un
+  chiffre), modifiez .env puis refaites les étapes 20 à 28.
+
+==========================================================================
+ PARTIE C — XCODE ET L'IPHONE
+==========================================================================
+
+--------------------------------------------------------------------------
+ÉTAPE 20 — Générer le projet iOS et l'ouvrir dans Xcode
+--------------------------------------------------------------------------
+Objectif : créer le projet Xcode de Manhunt (dossier « ios »), avec ses
+bibliothèques natives.
+Instructions :
+       $ cd ~/ManHunt/apps/mobile
+       $ npx expo prebuild --platform ios --clean
+  (Répondez « y » si une question s'affiche.) La commande installe aussi
+  les bibliothèques iOS (« Installing CocoaPods dependencies »).
+  Puis ouvrez le projet dans Xcode :
+       $ open ios/Manhunt.xcworkspace
+Résultat attendu : Xcode s'ouvre avec, à gauche, un projet « Manhunt ».
+  Ouvrez toujours le fichier .xcworkspace (blanc), jamais le
+  .xcodeproj (bleu).
+Erreurs fréquentes :
+  - « pod install failed » / « CocoaPods could not find compatible
+    versions » :
+       $ cd ~/ManHunt/apps/mobile/ios
+       $ pod install --repo-update
+       $ cd ..
+  - « Couldn't find ios/Manhunt.xcworkspace » : regardez le nom exact
+    avec   ls ios   et ouvrez le fichier qui finit par .xcworkspace.
+
+--------------------------------------------------------------------------
+ÉTAPE 21 — Ouvrir « Signing & Capabilities »
+--------------------------------------------------------------------------
+Objectif : indiquer à Xcode avec quel compte Apple signer l'application.
+Instructions :
+  1. D'abord, ajoutez votre identifiant Apple à Xcode : menu Xcode >
+     Settings… (ou Préférences…) > onglet « Accounts » > bouton « + » >
+     « Apple ID » > connectez-vous. Fermez la fenêtre.
+  2. Dans la colonne de gauche, cliquez sur le projet « Manhunt » (icône
+     bleue tout en haut).
+  3. Dans la partie centrale, sous « TARGETS », sélectionnez « Manhunt ».
+  4. Cliquez sur l'onglet « Signing & Capabilities » (en haut).
+
+--------------------------------------------------------------------------
+ÉTAPE 22 — Activer « Automatically manage signing »
+--------------------------------------------------------------------------
+Instructions : cochez la case « Automatically manage signing ».
+Résultat attendu : la case reste cochée.
+
+--------------------------------------------------------------------------
+ÉTAPE 23 — Sélectionner votre « Personal Team »
+--------------------------------------------------------------------------
+Instructions : dans « Team », choisissez « Votre Nom (Personal Team) ».
+  Vérifiez que « Bundle Identifier » affiche bien votre identifiant de
+  l'étape 19.
+Résultat attendu : « Signing Certificate: Apple Development: … » et plus
+  aucun message rouge (un message disant qu'aucun appareil n'est
+  enregistré disparaîtra à l'étape 27).
+Erreurs fréquentes :
+  - Une capacité « Push Notifications » apparaît en rouge (« Personal
+    development teams do not support the Push Notifications
+    capability ») : cliquez sur la petite poubelle/croix de la ligne
+    « Push Notifications » pour la retirer. (Manhunt n'utilise que des
+    notifications locales, elle est normalement déjà absente.)
+  - « Failed to register bundle identifier » : voir étape 19.
+
+--------------------------------------------------------------------------
+ÉTAPE 24 — Connecter l'iPhone
+--------------------------------------------------------------------------
+Instructions : branchez l'iPhone au Mac avec le câble et déverrouillez-le.
+
+--------------------------------------------------------------------------
+ÉTAPE 25 — Accepter la confiance entre les appareils
+--------------------------------------------------------------------------
+Instructions : sur l'iPhone, une fenêtre « Faire confiance à cet
+  ordinateur ? » apparaît : touchez « Se fier » et entrez le code de
+  l'iPhone. Sur le Mac, acceptez aussi si une fenêtre le demande.
+Résultat attendu : dans Xcode, menu Window > Devices and Simulators,
+  l'iPhone apparaît (parfois « Preparing… » quelques minutes la première
+  fois : attendez).
+
+--------------------------------------------------------------------------
+ÉTAPE 26 — Activer le mode développeur sur l'iPhone
+--------------------------------------------------------------------------
+Objectif : iOS exige ce mode pour lancer une application compilée soi-même.
+Instructions : sur l'iPhone, Réglages > Confidentialité et sécurité >
+  descendez tout en bas > « Mode développeur » > activez-le > l'iPhone
+  redémarre > après le redémarrage, touchez « Activer » et entrez le code.
+Remarque : l'option « Mode développeur » n'apparaît qu'une fois l'iPhone
+  branché au Mac avec Xcode ouvert (étapes 24–25). Si elle n'apparaît
+  pas, débranchez/rebranchez l'iPhone et rouvrez Xcode.
+
+--------------------------------------------------------------------------
+ÉTAPE 27 — Sélectionner l'iPhone comme destination
+--------------------------------------------------------------------------
+Instructions :
+  1. En haut au centre de la fenêtre Xcode, cliquez sur le nom de
+     l'appareil (à droite de « Manhunt ») et choisissez VOTRE iPhone
+     (pas un simulateur).
+  2. IMPORTANT — version autonome : menu Product > Scheme > Edit Scheme…
+     > « Run » (à gauche) > onglet « Info » > « Build Configuration » :
+     choisissez « Release » > Close.
+     (En « Debug », l'application attend un ordinateur de développement
+     et affiche un écran de développeur : ce n'est pas ce qu'on veut.)
+
+--------------------------------------------------------------------------
+ÉTAPE 28 — Compiler
+--------------------------------------------------------------------------
+Instructions : cliquez sur le bouton « Lecture » ▶ en haut à gauche (ou
+  Cmd + R). La première compilation dure 5 à 20 minutes.
+Résultat attendu : « Build Succeeded » puis l'application s'installe.
+Erreurs fréquentes : voir l'étape 35 (Dépannage).
+
+--------------------------------------------------------------------------
+ÉTAPE 29 — Installation
+--------------------------------------------------------------------------
+Si Xcode affiche « Could not launch Manhunt » / « Unable to launch …
+  because it has an invalid code signature, inadequate entitlements or
+  its profile has not been explicitly trusted » : c'est normal la
+  première fois. Sur l'iPhone : Réglages > Général > VPN et gestion de
+  l'appareil > votre identifiant Apple (« Apple Development: … ») >
+  « Faire confiance » > confirmez. Puis relancez avec ▶ dans Xcode, ou
+  touchez simplement l'icône Manhunt sur l'iPhone.
+Résultat attendu : l'icône « Manhunt » est sur l'écran d'accueil de
+  l'iPhone.
+
+--------------------------------------------------------------------------
+ÉTAPE 30 — Premier lancement
+--------------------------------------------------------------------------
+Instructions : ouvrez Manhunt (l'iPhone peut rester branché ou non).
+  « Commencer » > « Jouer en invité » (ou créer un compte e-mail) >
+  choisissez un pseudo.
+Résultat attendu : vous arrivez sur l'écran « Localisation », puis sur
+  l'accueil (« Créer un salon », « Rejoindre un salon »).
+Si « Serveur non configuré » s'affiche : le fichier .env était vide ou
+  mal rempli au moment de la compilation → corrigez l'étape 16, refaites
+  l'étape 20, puis 28.
+Vérifiez la version : Réglages (roue dentée) > en bas « Version 0.4.0 ».
+
+--------------------------------------------------------------------------
+ÉTAPE 31 — Autorisations GPS
+--------------------------------------------------------------------------
+Instructions : sur l'écran « Localisation » de Manhunt, touchez
+  « Autoriser pendant l'utilisation » puis « Autoriser lorsque l'app est
+  active ». Ensuite « Autoriser en arrière-plan » et choisissez
+  « Remplacer par Toujours autoriser » si iOS le propose (iOS peut aussi
+  le proposer plus tard, pendant une partie). Vérifiez aussi : Réglages
+  de l'iPhone > Manhunt > Position > « Toujours » et « Position exacte »
+  activée.
+Résultat attendu : les lignes de l'écran Localisation passent au vert.
+
+--------------------------------------------------------------------------
+ÉTAPE 32 — Autorisations notifications
+--------------------------------------------------------------------------
+Instructions : même écran, « Notifications (recommandé) » > « Autoriser
+  les notifications » > « Autoriser ».
+Utilité : alertes écran éteint pendant une partie (Chasseur proche,
+  capture, SOS…). Si l'application est complètement fermée (balayée vers
+  le haut), aucune notification ne peut arriver.
+
+--------------------------------------------------------------------------
+ÉTAPE 33 — Tester la carte
+--------------------------------------------------------------------------
+Instructions : accueil > « Créer un salon » > dans « Zone de jeu »,
+  cherchez un lieu (ex. un parc près de chez vous) ou « Centrer sur ma
+  position ».
+Résultat attendu : la carte sombre s'affiche avec les rues et un cercle
+  bleu. Si la carte reste noire : vérifiez Internet (Wi-Fi ou données).
+
+--------------------------------------------------------------------------
+ÉTAPE 34 — Test multijoueur avec un téléphone Android
+--------------------------------------------------------------------------
+Objectif : vérifier qu'un iPhone et un Android jouent ensemble.
+Instructions :
+  1. Sur l'Android (APK Manhunt 0.4.0 installé), créez un salon, choisissez
+     une zone, touchez « Inviter des amis » ou notez le code à 6 caractères.
+  2. Sur l'iPhone : accueil > « Rejoindre un salon » > tapez le code.
+  3. Les deux : choisissez une équipe (un Chasseur, un Fugitif), cochez
+     l'acceptation des consignes, l'hôte touche « Lancer la partie ».
+  4. Sortez dehors, éloignez-vous de quelques dizaines de mètres puis
+     rapprochez-vous : les positions approximatives s'affichent, le
+     Chasseur peut capturer (bouton « Capturer » à moins de 15 m, ou
+     « Scanner » le QR code affiché par le Fugitif avec « Mon QR »).
+  5. Testez un message rapide (flèche ^ en bas > onglet « Équipe ») et le
+     bouton SOS (puis « Lever l'alerte » et reprise par l'hôte).
+Résultat attendu : les deux téléphones voient la même partie, le même
+  chronomètre, et la capture apparaît des deux côtés.
+Notez ce qui ne fonctionne pas (modèle d'iPhone, version d'iOS, capture
+  d'écran) et envoyez-le à la personne qui gère Manhunt.
+
+==========================================================================
+ PARTIE D — DÉPANNAGE, LIMITES, CHECKLIST
+==========================================================================
+
+--------------------------------------------------------------------------
+ÉTAPE 35 — Dépannage détaillé
+--------------------------------------------------------------------------
+« Signing for "Manhunt" requires a development team »
+  → Étapes 21 à 23 (choisir la Personal Team).
+« Failed to register bundle identifier » / « No profiles for … were found »
+  → Identifiant déjà pris : changez APP_BUNDLE_ID (étape 19), puis
+    étapes 20 à 28.
+« Personal development teams … do not support the Push Notifications capability »
+  → Retirez la capacité « Push Notifications » dans Signing &
+    Capabilities (étape 23).
+« Your maximum App ID limit has been reached » (compte gratuit)
+  → Vous avez créé trop d'identifiants cette semaine (10 par 7 jours) :
+    réutilisez un identifiant déjà utilisé ou attendez quelques jours.
+« The application could not be verified » / « Untrusted Developer »
+  → Étape 29 (Faire confiance au développeur sur l'iPhone).
+« Developer Mode disabled » / l'application ne se lance pas
+  → Étape 26.
+« iPhone is busy: Preparing debugger support »
+  → Attendez (jusqu'à 10 min la première fois), laissez l'iPhone
+    déverrouillé et branché.
+« The iOS deployment target … » / l'iPhone n'apparaît pas comme destination
+  → iOS de l'iPhone trop ancien pour cette version : mettez l'iPhone à
+    jour (Réglages > Général > Mise à jour logicielle). Si impossible,
+    l'iPhone n'est pas compatible.
+Erreur pendant « pod install » ou « Installing CocoaPods dependencies »
+  → $ cd ~/ManHunt/apps/mobile/ios && pod install --repo-update && cd ..
+« Command PhaseScriptExecution failed » / « node: command not found » dans Xcode
+  → Xcode ne trouve pas Node.js. Tapez :
+       $ echo "export NODE_BINARY=$(command -v node)" > ~/ManHunt/apps/mobile/ios/.xcode.env.local
+    puis recompilez (Cmd + R).
+L'application affiche « Serveur non configuré »
+  → .env incomplet (étape 16) ; corrigez puis étapes 20 et 28.
+« Connexion au serveur impossible »
+  → Pas d'Internet, ou serveur en pause (projet gratuit inactif plus de
+    7 jours) : prévenez la personne qui gère Manhunt.
+La carte reste noire
+  → Internet coupé ou service de cartes indisponible : réessayez plus
+    tard. Le jeu peut afficher « Fond de carte indisponible ».
+La position reste « Recherche du signal GPS… »
+  → Sortez à découvert, vérifiez Réglages > Manhunt > Position
+    (« Toujours » + « Position exacte »).
+Mettre à jour Manhunt quand une nouvelle version sort
+  → $ cd ~/ManHunt && git pull && npm install
+    $ cd apps/mobile && npx expo prebuild --platform ios --clean
+    puis rouvrez ios/Manhunt.xcworkspace, vérifiez la Team (étape 23) et
+    la configuration Release (étape 27), et ▶ (étape 28).
+Repartir de zéro en cas de blocage
+  → $ cd ~/ManHunt/apps/mobile && rm -rf ios && npx expo prebuild --platform ios --clean
+    puis étapes 20 à 28.
+
+--------------------------------------------------------------------------
+ÉTAPE 36 — Limites du compte Apple gratuit
+--------------------------------------------------------------------------
+  - L'application installée EXPIRE APRÈS 7 JOURS : elle ne s'ouvre plus.
+    Rebranchez l'iPhone, ouvrez ios/Manhunt.xcworkspace et refaites ▶
+    (étape 28) pour la renouveler pour 7 jours (vos données restent).
+  - 3 applications maximum installées ainsi en même temps sur l'iPhone.
+  - 10 nouveaux identifiants d'application maximum par période de 7 jours.
+  - Pas de notifications PUSH à distance (Manhunt n'utilise que des
+    notifications locales : pas de souci).
+  - Pas de distribution à d'autres personnes : chaque testeur iPhone doit
+    compiler lui-même, ou la personne qui gère Manhunt doit souscrire
+    l'Apple Developer Program (99 $/an) pour distribuer via TestFlight.
+  - La localisation en arrière-plan fonctionne avec un compte gratuit,
+    mais iOS peut espacer les mises à jour écran éteint : gardez
+    l'application ouverte quand c'est possible.
+
+--------------------------------------------------------------------------
+ÉTAPE 37 — Checklist finale
+--------------------------------------------------------------------------
+  [ ] Xcode installé, ouvert une fois, plateforme iOS installée
+  [ ] Licence acceptée, outils en ligne de commande installés
+  [ ] Homebrew, Node.js 22+, CocoaPods installés
+  [ ] Invitation GitHub acceptée, projet cloné dans ~/ManHunt
+  [ ] npm install terminé
+  [ ] apps/mobile/.env rempli (adresse serveur, clé publique, APP_BUNDLE_ID unique)
+  [ ] npx expo prebuild --platform ios --clean terminé
+  [ ] Xcode : Personal Team choisie, aucune erreur rouge, configuration Release
+  [ ] iPhone : « Se fier », Mode développeur activé, développeur approuvé
+  [ ] Manhunt s'ouvre, Réglages affiche « Version 0.4.0 »
+  [ ] Localisation « Toujours » + « Position exacte », notifications autorisées
+  [ ] La carte s'affiche
+  [ ] Partie de test réussie avec un téléphone Android
+  [ ] Rappel noté : réinstaller depuis Xcode avant 7 jours
+
+Merci de tester Manhunt ! Envoyez vos retours (ce qui marche, ce qui ne
+marche pas, modèle d'iPhone, version d'iOS) à la personne qui gère le jeu.

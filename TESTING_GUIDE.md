@@ -2,18 +2,19 @@
 
 | Niveau | Outil | Projet Supabase ? | Appareil ? | État |
 |--------|-------|-------------------|-----------|------|
-| Unitaires (logique partagée) | Vitest | non | non | ✅ exécutés (27) |
-| Base de données (intégration, sécurité, GPS, confidentialité, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel) | non | non | ✅ exécutés (58) |
-| Typage, lint, `expo-doctor`, bundles Metro Android/iOS | tsc, ESLint, Expo | non | non | ✅ exécutés |
-| APK release Android + contrôles (version, signature, configuration, secrets) | `npm run release:apk` | non | non | ✅ v0.3.0, v0.3.1 (voir `releases/v*/BUILD_REPORT.md`) — contrôles statiques ; installation sur appareil non réalisée |
+| Unitaires (logique partagée) | Vitest | non | non | ✅ exécutés (30) |
+| Base de données (intégration, sécurité, GPS, confidentialité, administration, modes v0.4.0, simulation 20 joueurs) | Vitest + PGlite (PostgreSQL réel) | non | non | ✅ exécutés (73) |
+| Typage, lint, `expo-doctor`, bundles Metro Android/iOS, configuration iOS (Info.plist, droits) | tsc, ESLint, Expo | non | non | ✅ exécutés |
+| APK release Android + contrôles (version, signature, configuration, secrets) | `npm run release:apk` | non | non | ✅ v0.3.0, v0.3.1, v0.4.0 (voir `releases/v*/BUILD_REPORT.md`) — contrôles statiques ; installation sur appareil non réalisée |
 | Test de charge réseau réel (20 clients Realtime) | `scripts/load-test.mjs` | **oui** | non | ⏳ à lancer par vous |
 | Tests sur téléphones (GPS, arrière-plan, carte) | procédures ci-dessous | **oui** | **oui** | ⏳ à faire par vous — **jamais réalisés à ce jour** |
+| Compilation et installation iOS | Mac + Xcode, `GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt` | **oui** | **Mac + iPhone** | ⏳ jamais réalisées (impossible sous Windows) |
 
 ## 1. Tests automatisés
 
 ```bash
 npm install
-npm test                 # 85 tests
+npm test                 # 103 tests
 npm run test:unit        # géographie, configuration, état, couches carte, contrôleur, séquenceur, horloge
 npm run test:db          # salons, moteur GPS, sécurité, parité TS/SQL, cron, simulation
 npm run typecheck        # racine + shared + mobile
@@ -25,6 +26,7 @@ Couverture des tests base de données (PostgreSQL réel, rôles et RLS appliqué
 - **game.test.ts** : zone et consentement obligatoires ; aucune position initiale ; validation des positions (bornes, horodatage, ordre, **vitesse implausible**, distance) ; refus sans consentement / après la fin ; diffusion ~10 m aux coéquipiers et approximative + limitée aux adversaires ; précision jamais supérieure au GPS ; Fugitifs invisibles en préparation ; sortie de zone et élimination ; capture refusée hors zone ; captures par distance réelle (précision, fraîcheur, recharge, victoire) ; Infection et rotation du canal ; radar direction/distance, brouillage, signal perdu, secteur, zone, mode « impulsions » ; Fantôme, Leurre, Brouilleur, Scan, Traqueur, Sonar ; **arrêt de sécurité** (sortie + effacement) ; **rétention 24 h** ; vue de partie sans coordonnées adverses exactes ; pause ; fin du temps ; abandon.
 - **security.test.ts** : positions brutes inaccessibles à tous les clients, isolation des équipes, colonnes techniques, journal filtré, aucune écriture directe, fonctions privées inaccessibles, rôle anonyme, non-participant, autorisations des canaux Realtime, interdiction de diffuser, **aucune coordonnée brute dans aucun flux**, séquences contiguës.
 - **simulation.test.ts** : 20 joueurs marchant ~1,5 m/s pendant 6 min, envoi toutes les 5 s, poursuites et captures ; invariants et volume Realtime (~32 messages/s).
+- **v040.test.ts** (v0.4.0, 15 tests) : rôles et sanctions (propriétaire seul attribue les rôles, limite 72 h des modérateurs, suspendu = plus de salon), journal d'audit, interventions en partie annoncées et sans aucune coordonnée, absence de toute fonction admin de capture/déplacement/résultat, limite globale de joueurs, fonctionnalité désactivable, versions publiées lisibles sans connexion, signalements ; Royale (calcul serveur de la zone, hors zone après réduction, cercle exigé) ; Mister X (un seul Fugitif, jamais diffusé, révélé aux seuls Chasseurs) ; QR (usage unique, expiration, distance, code manuel, méthode QR seule) ; balises, extraction, victoire par objectifs ; polygone et zones interdites ; messages et repères réservés à l'équipe, spectateur privé du canal d'équipe, positions différées ; SOS (pause, reprise bloquée, position seulement si acceptée) ; GPS muet sans sanction, batterie réservée à l'équipe ; replay 24 h, succès, statistiques par mode, partie interrompue sans succès.
 - **privacy-events.test.ts** (v0.3.0) : après la partie, aucun événement de position de l'équipe adverse lisible ; effacement des événements de position 24 h après la fin ; arrêt de sécurité = effacement des événements de position du joueur.
 - **rooms.test.ts** : profils, salons, codes, force brute, équipes, hôte, exclusion, conditions de lancement.
 
@@ -41,6 +43,35 @@ Installez `releases/vX.Y.Z/application-vX.Y.Z.apk` (DEPLOYMENT_GUIDE §0), puis 
 8. Fin de partie → **Résultats** → **Retour au salon** → **Nouvelle partie** ; vérifier que la notification « Partage de position actif » a disparu.
 
 Notez pour chaque point : OK / KO + modèle du téléphone + version d'Android.
+
+## 1 ter. Checklist terrain v0.4.0 (2 téléphones minimum)
+
+| # | Fonction | Procédure | Attendu |
+|---|----------|-----------|---------|
+| 1 | Version | Réglages | « Version 0.4.0 (build 400) » |
+| 2 | Alerte de mise à jour | Administration > Réglages > Publier une version 0.4.1 de test, puis rouvrir l'accueil | Bandeau « Nouvelle version disponible » (puis republier 0.4.0 ou ignorer) |
+| 3 | Notifications | Autorisations > Notifications ; en partie, écran éteint, laisser l'autre joueur s'approcher | Notification « Chasseur proche » / « Fugitif détecté » |
+| 4 | Messages rapides | Partie > ^ > Équipe > « Besoin d'aide » | Coéquipier : bannière + journal ; adversaire : rien |
+| 5 | Repère | Appui long sur la carte > « Danger » | Point jaune chez le coéquipier, disparu après 3 min |
+| 6 | SOS | Bouton SOS > message + partage | Partie en pause chez tous, écran SOS ; reprise refusée tant que non levé |
+| 7 | QR | Méthode « GPS ou QR » ; Fugitif > Mon QR ; Chasseur > Scanner | Capture confirmée ; un 2e scan du même code est refusé |
+| 8 | Code manuel | Chasseur > Scanner > saisir le code à 6 caractères | Capture confirmée |
+| 9 | Royale | Mode Royale, 20 min, 3 réductions | Cercle en pointillés + compte à rebours ; alerte avant réduction ; hors zone après |
+| 10 | Mister X | Mode Mister X, 1 Fugitif | Chasseurs : jamais de point entre deux révélations ; point vert à chaque révélation |
+| 11 | Balises | Placer 2 balises + extraction | Balise prise annoncée ; extraction ouverte en fin ; exfiltré non capturable |
+| 12 | Zone interdite | Ajouter une zone interdite, y entrer | « Hors zone » |
+| 13 | Spectateur | Se faire capturer | Bandeau spectateur, positions décalées, messages d'équipe impossibles |
+| 14 | GPS muet | Couper la localisation 2 min | Alerte « GPS muet » chez tous, pas d'élimination |
+| 15 | Batterie | Onglet Équipe | Pourcentage de batterie des coéquipiers |
+| 16 | Rendez-vous | Placer un RDV | « Fin vers hh:mm · Rendez-vous : … » en partie |
+| 17 | Configurations | Créer un salon > Enregistrer ces règles ; Réglages > Mes configurations | Charger / renommer / dupliquer / supprimer |
+| 18 | Carte hors ligne | Règles du salon > Télécharger la carte ; mode avion | Fond de carte visible hors réseau (le jeu, lui, exige le réseau) |
+| 19 | Replay | Fin de partie > Revoir la partie | Trajets animés, chronologie |
+| 20 | Succès / stats | Profil | Succès débloqués, statistiques par mode |
+| 21 | Administration | Réglages > Administration (compte propriétaire) | Vue générale, joueurs, parties, signalements, réglages, journal |
+| 22 | Signalement | Lobby > toucher un joueur > Signaler | Visible dans Administration > Signalements |
+
+Notez OK / KO, le modèle et la version d'Android/iOS. iOS : suivez d'abord `GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt`.
 
 ## 2. Simuler 20 joueurs réels (charge réseau)
 

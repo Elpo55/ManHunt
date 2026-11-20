@@ -1,8 +1,8 @@
-# Projet Traque (nom provisoire)
+# Manhunt
 
 Application mobile **Android et iOS** de chasse géolocalisée entre amis : les **Chasseurs** poursuivent les **Fugitifs** dans le monde réel, sur une vraie carte OpenStreetMap, à partir de la position GPS de chaque joueur — partagée **uniquement pendant une partie, avec consentement explicite**, et arrondie avant d'être montrée aux autres.
 
-> Le nom se règle avec `EXPO_PUBLIC_APP_NAME` (défaut : « Projet Traque »).
+> Nom affiché réglable avec `EXPO_PUBLIC_APP_NAME` (défaut : « Manhunt »). Version courante : **0.4.0** (build 400).
 
 ## Fonctionnalités
 
@@ -15,9 +15,16 @@ Application mobile **Android et iOS** de chasse géolocalisée entre amis : les 
 - **Radar serveur** : direction + distance, secteur ou zone ; automatique ou manuel ; brouillage ; alerte côté adverse.
 - **Captures** : par proximité GPS (15 m par défaut), positions fraîches et précises exigées, validées par le serveur.
 - **Capacités** : Fantôme, Brouilleur, Leurre (Fugitifs) ; Scan, Traqueur, Sonar (Chasseurs).
-- **Modes** : Classique (priorité, complet) et Infection ; Mister X et Royale prévus.
+- **Modes** : Classique, Infection, **Royale** (zone qui se réduit, calculée par le serveur) et **Mister X** (un Fugitif révélé à intervalle).
+- **Capture par QR code** (temporaire, usage unique) ou code à 6 caractères, en plus de la capture GPS.
+- **Objectifs** : balises à atteindre, point d'extraction ; **zones polygonales et interdites**.
+- **Équipe** : messages rapides prédéfinis, repères sur la carte, batterie et état des coéquipiers.
+- **Sécurité** : bouton **SOS** (pause immédiate, alerte, position seulement si acceptée, rappel du 112), heure de fin et point de rendez-vous, détection du **GPS muet**, spectateurs sans information exploitable.
+- **Administration intégrée** : rôles (propriétaire, administrateur, modérateur), tableau de bord, sanctions, signalements, paramètres globaux, journal d'audit — sans aucun accès aux positions ni pouvoir sur les résultats.
+- **Confort** : configurations sauvegardées, cartes hors ligne, replay 24 h, succès, statistiques par mode, notifications locales, alerte de nouvelle version.
 - **Anti-triche** : vitesse implausible, horodatages incohérents, fréquence limitée, tout calculé côté serveur.
-- **Après-partie** : résultats, classement, chronologie, statistiques, historique, classement privé.
+- **Après-partie** : résultats, classement, chronologie, replay, succès, statistiques, historique, classement privé.
+- **iOS** : à compiler sur Mac avec un compte Apple gratuit — [GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt](GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt).
 
 ## Architecture
 
@@ -66,7 +73,7 @@ Voir [TESTING_GUIDE.md](TESTING_GUIDE.md), dont la procédure de test terrain av
 
 ## Versions et APK
 
-Version courante : **0.3.1** (build 301). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
+Version courante : **0.4.0** (build 400). Chaque version finalisée est livrée en APK installable dans `releases/vX.Y.Z/` avec son changelog et son rapport de build (procédure : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) §0, règles : [CLAUDE.md](CLAUDE.md)).
 
 ## Historique
 

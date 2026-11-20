@@ -2,27 +2,38 @@
 
 Légende : `[ ]` à faire par vous · `[x]` fait par Claude (vérifié) · `[ ] (à vérifier)` à contrôler · `[!]` bloqué (compte, paiement ou appareil requis).
 
-État au 19 novembre 2026 — **version 0.3.1 (build 301)**.
+État au 20 novembre 2026 — **version 0.4.0 (build 400)**.
 
 ---
 
 ## Déjà fait
 
 - [x] Audit, sauvegardes (`v0.1.0-web`, branche `archive/web-real-world-map`), plan de migration (docs/MIGRATION_MOBILE_GPS.md).
-- [x] Monorepo : `packages/shared` (logique testée) + `apps/mobile` (Expo SDK 58, 15 écrans). Migrations serveur 0100 → 0900.
+- [x] Monorepo : `packages/shared` (logique testée) + `apps/mobile` (Expo SDK 58, 19 écrans). Migrations serveur 0100 → 1020, **toutes appliquées au projet Supabase**.
 - [x] **Supabase configuré** (projet `ibyntjdoongvrvrieicn`, eu-west-1) : 9 migrations appliquées, 13 tables avec RLS, invité ON, confirmation e-mail OFF, limite invités 100/h/IP, Realtime privé + Presence, pg_cron (`pt-tick`, `pt-cleanup`).
 - [x] `apps/mobile/.env` rempli (URL, clé publique *anon*, `APP_BUNDLE_ID=com.elpo55.syceus`).
 - [x] v0.3.0 : audit complet et corrections (voir CHANGELOG.md), 85 tests automatisés **exécutés et réussis**, typage et lint propres.
 - [x] v0.3.1 : permissions Android superflues retirées, contrôles de livraison fiabilisés.
-- [x] **APK Android release compilés sur ce PC** : `releases/v0.3.1/application-v0.3.1.apk` (**à installer**) ; `releases/v0.3.0/` conservé. Signés avec la clé de **débogage** (test uniquement). Contrôles statiques réussis ; **installation non testée** (aucun téléphone ni émulateur disponible).
+- [x] v0.4.0 : administration (votre compte Elpo55 = **propriétaire**), Royale, Mister X, QR, objectifs, zones, spectateurs, SOS, équipe, notifications locales, configurations, cartes hors ligne, replay, succès ; 103 tests réussis ; guide iOS `GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt`.
+- [x] **APK Android release compilés sur ce PC** : `releases/v0.4.0/Manhunt-v0.4.0.apk` (**à installer**) ; `releases/v0.3.0/` et `v0.3.1/` conservés. Signés avec la clé de **débogage** (test uniquement). Contrôles statiques réussis ; **installation non testée** (aucun téléphone ni émulateur disponible).
 
 **Jamais réalisé à ce jour** : installation sur un téléphone, test GPS réel, partie à plusieurs appareils, build iOS. Ces étapes exigent vos appareils.
 
-## 0. Priorité : tester l'APK v0.3.1
-- [ ] Installer `releases/v0.3.1/application-v0.3.1.apk` sur votre Android (DEPLOYMENT_GUIDE §0).
-- [ ] Dérouler TESTING_GUIDE §1 bis (8 points, ~15 min, idéalement avec un second téléphone).
+## 0. Priorité : tester l'APK v0.4.0
+- [ ] Installer `releases/v0.4.0/Manhunt-v0.4.0.apk` (la v0.3.1 est mise à jour en conservant la session : même clé de débogage).
+- [ ] Dérouler TESTING_GUIDE §1 bis puis la **checklist v0.4.0 (§1 ter, 22 points)** avec un second téléphone.
+- [ ] Ouvrir Réglages > Administration : vérifier le tableau de bord (vous êtes propriétaire).
 - [ ] M'envoyer les KO (modèle, version d'Android, capture d'écran si possible).
-- [ ] Après votre première connexion : me dire « je suis connecté » pour le compte administrateur (2.5).
+- [x] Compte administrateur (fait : propriétaire).
+
+## 0 bis. Pour votre ami iPhone
+- [ ] L'inviter sur GitHub : dépôt ManHunt > Settings > Collaborators > Add people (son nom d'utilisateur GitHub).
+- [ ] Lui envoyer **en privé** l'adresse du serveur (`https://ibyntjdoongvrvrieicn.supabase.co`) et la **clé publique** (`EXPO_PUBLIC_SUPABASE_ANON_KEY` de votre `apps/mobile/.env`) — jamais la clé `service_role` ni une clé secrète.
+- [ ] Lui donner `GUIDE_INSTALLATION_IOS_POUR_TESTEUR.txt` (aussi dans le dépôt). Il lui faut un Mac récent (Xcode 26+), son iPhone et son identifiant Apple gratuit.
+
+## 0 ter. Distribution (facultatif)
+- [ ] Héberger l'APK à une adresse https pour vos amis (Drive, etc.), puis Administration > Réglages > « Publier une version » avec ce lien : les téléphones plus anciens verront l'alerte de mise à jour (DEPLOYMENT_GUIDE §7).
+- [ ] EAS Update (correctifs sans réinstaller) : compte Expo gratuit + `npx eas-cli init` puis me le dire (DEPLOYMENT_GUIDE §6).
 
 ## 1. Comptes externes
 
