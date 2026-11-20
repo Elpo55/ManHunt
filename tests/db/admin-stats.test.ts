@@ -48,10 +48,10 @@ describe("correction des statistiques (propriétaire)", () => {
     await expectRpcError(db.as(mod).rpc("admin_set_achievement", { p_user: p.id, p_key: "first_win", p_unlocked: true, p_reason: "Test" }), "E_FORBIDDEN");
     await expectRpcError(db.as(owner).rpc("admin_set_achievement", { p_user: p.id, p_key: "nope", p_unlocked: true, p_reason: "Test" }), "E_NOT_FOUND");
     await db.as(owner).rpc("admin_set_achievement", { p_user: p.id, p_key: "first_win", p_unlocked: true, p_reason: "Victoire perdue au bug" });
-    expect((await db.as(p).rpc<Json[]>("get_my_achievements")).find((a) => a.key === "first_win").unlocked_at).not.toBeNull();
+    expect((await db.as(p).rpc<Json[]>("get_my_achievements")).find((a) => a.key === "first_win")?.unlocked_at).not.toBeNull();
     await expectRpcError(db.as(owner).rpc("admin_set_achievement", { p_user: p.id, p_key: "first_win", p_unlocked: true, p_reason: "Doublon" }), "E_INVALID_STATS");
     await db.as(owner).rpc("admin_set_achievement", { p_user: p.id, p_key: "first_win", p_unlocked: false, p_reason: "Attribué par erreur" });
-    expect((await db.as(p).rpc<Json[]>("get_my_achievements")).find((a) => a.key === "first_win").unlocked_at).toBeNull();
+    expect((await db.as(p).rpc<Json[]>("get_my_achievements")).find((a) => a.key === "first_win")?.unlocked_at).toBeNull();
     const d = await db.as(owner).rpc<Json>("admin_player_detail", { p_user: p.id });
     expect(d.corrections.map((c: Json) => c.action)).toEqual(["set_achievement", "set_achievement"]);
   });
