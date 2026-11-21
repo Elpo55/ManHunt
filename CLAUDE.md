@@ -25,8 +25,9 @@ Toute nouvelle version finalisée entraîne, sans qu'on ait à le redemander :
    (arm64-v8a + armeabi-v7a), contrôles (aapt : version/build/identifiant ; apksigner ; URL
    Supabase intégrée ; aucun secret), puis `releases/vX.Y.Z/` :
    `Manhunt-vX.Y.Z.apk` (v0.3.x : `application-vX.Y.Z.apk`), `CHANGELOG.md`, `BUILD_REPORT.md`.
-6. Jamais écraser un APK déjà livré (le script refuse) ; les APK ne sont pas versionnés dans Git
-   (`releases/**/*.apk` ignoré), leurs CHANGELOG/BUILD_REPORT le sont.
+6. Jamais écraser un APK déjà livré (le script refuse) ; les APK SONT versionnés dans Git avec
+   leurs CHANGELOG/BUILD_REPORT (commités et poussés sur GitHub : l'utilisateur les transmet par le dépôt).
+   Limite GitHub : 100 Mo par fichier.
 7. Livrable annoncé à l'utilisateur : version, nouveautés, bugs corrigés, tests effectués / non
    effectués, état de compilation, chemin exact de l'APK, procédure d'installation.
 
